@@ -14,6 +14,10 @@ set(LOADABLE_EXTENSION_NAME ${TARGET_NAME}_loadable_extension)
 project(${TARGET_NAME})
 include_directories(src/include)
 
+# TileStore & BF
+include_directories("$ENV{PREVISION_PATH}/tilestore/include")
+include_directories("$ENV{PREVISION_PATH}/buffertile/include")
+
 set(EXTENSION_SOURCES src/quack_extension.cpp)
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
@@ -22,6 +26,15 @@ build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
 # Link OpenSSL in both the static library as the loadable extension
 target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
+
+# TileStore & BF
+target_link_libraries(${EXTENSION_NAME} "$ENV{PREVISION_PATH}/buffertile/lib/libbf.a")
+target_link_libraries(${EXTENSION_NAME} "$ENV{PREVISION_PATH}/tilestore/lib/libtilestore.a")
+target_link_libraries(${EXTENSION_NAME} -lrt)
+
+target_link_libraries(${LOADABLE_EXTENSION_NAME} "$ENV{PREVISION_PATH}/buffertile/lib/libbf.a")
+target_link_libraries(${LOADABLE_EXTENSION_NAME} "$ENV{PREVISION_PATH}/tilestore/lib/libtilestore.a")
+target_link_libraries(${LOADABLE_EXTENSION_NAME} -lrt)
 
 install(
   TARGETS ${EXTENSION_NAME}
