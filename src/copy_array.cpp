@@ -119,6 +119,7 @@ namespace duckdb
 
         void unpin()
         {
+            BF_TouchBuf(key);
             BF_UnpinBuf(key);
             delete arrname_char;
         }

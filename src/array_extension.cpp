@@ -25,8 +25,12 @@ namespace duckdb
 
 	void ArrayExtension::Load(DuckDB &db)
 	{
+		std::cerr << "ArrayExtension::BF_Init()" << std::endl;
+
 		BF_Init();
 		BF_Attach();
+
+		std::cerr << "define funtions" << std::endl;
 
 		// BF_Detach();
 		// BF_Free();
@@ -36,10 +40,12 @@ namespace duckdb
 		// auto copy_function = ArrayExtension::GetCopyFunction();
 		auto res = ArrayExtension::GetCopyFunction();
 
+		std::cerr << "Registering functions" << std::endl;
+
 		ExtensionUtil::RegisterFunction(*db.instance, table_function);
 		ExtensionUtil::RegisterFunction(*db.instance, res);
 
-		std::cout << "ArrayExtension::Load()" << std::endl;
+		std::cerr << "ArrayExtension::Load()" << std::endl;
 	}
 	std::string ArrayExtension::Name()
 	{
@@ -51,17 +57,17 @@ namespace duckdb
 
 extern "C"
 {
-	DUCKDB_EXTENSION_API void quack_init(duckdb::DatabaseInstance &db)
+	DUCKDB_EXTENSION_API void array_init(duckdb::DatabaseInstance &db)
 	{
-		std::cout << "quack_init()" << std::endl;
+		std::cout << "array_init()" << std::endl;
 
 		duckdb::DuckDB db_wrapper(db);
 		db_wrapper.LoadExtension<duckdb::ArrayExtension>();
 	}
 
-	DUCKDB_EXTENSION_API const char *quack_version()
+	DUCKDB_EXTENSION_API const char *array_version()
 	{
-		std::cout << "quack_version()" << std::endl;
+		std::cout << "array_version()" << std::endl;
 		return duckdb::DuckDB::LibraryVersion();
 	}
 }
