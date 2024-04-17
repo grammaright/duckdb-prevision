@@ -200,8 +200,8 @@ namespace duckdb
 
         for (idx_t i = 0; i < input.size(); i++)
         {
-            array_gstate.cur_idx++;
             array_gstate.buf[array_gstate.cur_idx] = vector[i];
+            array_gstate.cur_idx++;
         }
     }
 
