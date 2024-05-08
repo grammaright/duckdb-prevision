@@ -19,33 +19,24 @@ extern "C"
 namespace duckdb
 {
 
-	static void LoadInternal(DatabaseInstance &instance)
-	{
-	}
+	// static void LoadInternal(DatabaseInstance &instance)
+	// {
+	// }
 
 	void ArrayExtension::Load(DuckDB &db)
 	{
-		std::cerr << "ArrayExtension::BF_Init()" << std::endl;
+		std::cerr << "ArrayExtension::Load()" << std::endl;
 
 		BF_Init();
 		BF_Attach();
 
 		std::cerr << "define funtions" << std::endl;
-
-		// BF_Detach();
-		// BF_Free();
-		// LoadInternal(*db.instance);
-		// auto instance = ;
 		auto table_function = ArrayExtension::GetTableFunction();
-		// auto copy_function = ArrayExtension::GetCopyFunction();
-		auto res = ArrayExtension::GetCopyFunction();
+		auto copy_function = ArrayExtension::GetCopyFunction();
 
 		std::cerr << "Registering functions" << std::endl;
-
 		ExtensionUtil::RegisterFunction(*db.instance, table_function);
-		ExtensionUtil::RegisterFunction(*db.instance, res);
-
-		std::cerr << "ArrayExtension::Load()" << std::endl;
+		ExtensionUtil::RegisterFunction(*db.instance, copy_function);
 	}
 	std::string ArrayExtension::Name()
 	{

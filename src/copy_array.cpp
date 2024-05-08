@@ -182,12 +182,15 @@ namespace duckdb
     static unique_ptr<GlobalFunctionData> WriteArrayInitializeGlobal(ClientContext &context, FunctionData &bind_data,
                                                                      const string &file_path)
     {
+        std::cerr << "WriteArrayInitializeGlobal() called" << std::endl;
         return std::move(make_uniq<GlobalWriteArrayData>(context, bind_data, file_path));
     }
 
     static void WriteArraySink(ExecutionContext &context, FunctionData &bind_data, GlobalFunctionData &gstate,
                                LocalFunctionData &lstate, DataChunk &input)
     {
+        std::cerr << "WriteArraySink() called" << std::endl;
+
         // NOTE: I assume that only one thread runs
         auto array_gstate = gstate.Cast<GlobalWriteArrayData>();
 
@@ -201,6 +204,7 @@ namespace duckdb
 
         for (idx_t i = 0; i < input.size(); i++)
         {
+            std::cerr << "\tvector[i]=" << vector[i] << ", cur_idx=" << array_gstate.cur_idx << std::endl;
             array_gstate.buf[array_gstate.cur_idx] = vector[i];
             array_gstate.cur_idx++;
         }
@@ -212,6 +216,7 @@ namespace duckdb
     static void WriteArrayCombine(ExecutionContext &context, FunctionData &bind_data, GlobalFunctionData &gstate,
                                   LocalFunctionData &lstate)
     {
+        std::cerr << "WriteArrayCombine() called" << std::endl;
     }
 
     //===--------------------------------------------------------------------===//
@@ -219,6 +224,8 @@ namespace duckdb
     //===--------------------------------------------------------------------===//
     void WriteArrayFinalize(ClientContext &context, FunctionData &bind_data, GlobalFunctionData &gstate)
     {
+        std::cerr << "WriteArrayFinalize() called" << std::endl;
+
         auto array_gstate = gstate.Cast<GlobalWriteArrayData>();
         array_gstate.unpin();
     }
@@ -259,6 +266,8 @@ namespace duckdb
 
     CopyFunction ArrayExtension::GetCopyFunction()
     {
+        std::cerr << "GetCopyFunction() called" << std::endl;
+
         CopyFunction info("tilestore");
         info.copy_to_bind = WriteArrayBind;
         info.copy_to_initialize_local = WriteArrayInitializeLocal;
