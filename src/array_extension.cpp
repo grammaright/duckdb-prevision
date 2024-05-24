@@ -10,6 +10,7 @@
 #include "duckdb/parser/parsed_data/copy_info.hpp"
 
 #include "array_extension.hpp"
+#include <sys/stat.h>
 
 extern "C"
 {
@@ -19,15 +20,24 @@ extern "C"
 namespace duckdb
 {
 
-	// static void LoadInternal(DatabaseInstance &instance)
-	// {
-	// }
+	bool IsBFInitialized()
+	{
+		struct stat buf;
+		int ret = stat("/dev/shm/buffertile_bf", &buf);
+		return (ret == 0);
+	}
 
 	void ArrayExtension::Load(DuckDB &db)
 	{
 		std::cerr << "ArrayExtension::Load()" << std::endl;
 
-		BF_Init();
+		if (!IsBFInitialized())
+		{
+			// It will run only if in the development of DuckDB extension
+			BF_Init();
+			fprintf(stderr, "[ARRAY_EXT] BF_Init() is called because bf has not been initialized.\n");
+		}
+
 		BF_Attach();
 
 		std::cerr << "define funtions" << std::endl;
