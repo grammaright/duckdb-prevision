@@ -255,7 +255,7 @@ namespace duckdb
         strcpy(arrname_char, arrname);
 
         // TODO: Consider sparse tile in the future
-        array_key key = {arrname_char, (char *)"a", dcoords.get(), 2, BF_EMPTYTILE_DENSE};
+        array_key key = {arrname_char, (char *)"i", dcoords.get(), 2, BF_EMPTYTILE_DENSE};
 
         PFpage *page;
         if (BF_GetBuf(key, &page) != BFE_OK)

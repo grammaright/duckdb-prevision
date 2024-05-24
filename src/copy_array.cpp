@@ -91,9 +91,10 @@ namespace duckdb
             auto &data = bind_data.Cast<WriteArrayData>();
 
             // getbuffer
-            auto dcoords = make_uniq_array<uint64_t>(2);
-            dcoords[0] = data.tile_coords[0];
-            dcoords[1] = data.tile_coords[1];
+            // dcoords = make_uniq_array<uint64_t>(2);
+            dcoords = new uint64_t[2];
+            dcoords[0] = (uint64_t)data.tile_coords[0];
+            dcoords[1] = (uint64_t)data.tile_coords[1];
 
             auto arrname = data.array_name.c_str();
             // why allocate newly?
@@ -101,7 +102,7 @@ namespace duckdb
             strcpy(arrname_char, arrname);
 
             // TODO: Consider sparse tile in the future
-            key = {arrname_char, "a", dcoords.get(), data.dim_len, BF_EMPTYTILE_DENSE};
+            key = {arrname_char, (char *)"i", dcoords, data.dim_len, BF_EMPTYTILE_DENSE};
 
             PFpage *page;
             BF_GetBuf(key, &page);
@@ -132,6 +133,7 @@ namespace duckdb
     private:
         array_key key;
         char *arrname_char;
+        uint64_t *dcoords;
 
         // vector<uint64_t> current_coords_in_tile;
         // bool finished;
