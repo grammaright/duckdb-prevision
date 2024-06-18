@@ -1,0 +1,23 @@
+# name: test/sql/array.test
+# description: test array extension
+# group: [array]
+
+# Before we load the extension, this will fail
+statement error
+SELECT array('Sam');
+----
+Catalog Error: Scalar Function with name array does not exist!
+
+# Require statement will ensure this test is run with this extension loaded
+require array
+
+# Confirm the extension works
+query I
+SELECT array('Sam');
+----
+Array Sam 🐥
+
+query I
+SELECT array_openssl_version('Michael');
+----
+<REGEX>:Array Michael, my linked OpenSSL version is OpenSSL.*
