@@ -194,7 +194,8 @@ namespace duckdb
         std::cerr << "WriteArraySink() called" << std::endl;
 
         // NOTE: I assume that only one thread runs
-        auto array_gstate = gstate.Cast<GlobalWriteArrayData>();
+        auto &array_gstate = gstate.Cast<GlobalWriteArrayData>();
+
 
         // We don't know what vector type DuckDB will give
         // So we need to convert it to unified vector format
