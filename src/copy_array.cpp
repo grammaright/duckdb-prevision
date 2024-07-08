@@ -79,7 +79,7 @@ void GlobalWriteArrayData::pin(vector<uint64_t> _tile_coords) {
     tile_coords[1] = _tile_coords[1];
 
     // TODO: Consider sparse tile in the future
-    key = {arrname_char, (char *)"i", tile_coords, dim_len, BF_EMPTYTILE_DENSE};
+    key = {arrname_char, tile_coords, dim_len, BF_EMPTYTILE_DENSE};
 
     PFpage *page;
     assert(BF_GetBuf(key, &page) == BFE_OK);
