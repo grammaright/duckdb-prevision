@@ -98,28 +98,30 @@ uint64_t Put2DData(optional_ptr<const FunctionData> bind_data,
     auto local_remains =
         std::min((uint64_t)STANDARD_VECTOR_SIZE, total_remains);
 
-    for (uint64_t idx = 0; idx < local_remains; idx++) {
-        uint64_t *coords;
-        uint64_t buf_idx = gstate.cell_idx + idx;
-        bf_util_calculate_nd_from_1d_row_major(
-            buf_idx, (uint64_t *)data.tile_size.data(), 2, &coords);
-
-        double val = pagevals[buf_idx];
-
-        for (uint32_t i = 0; i < gstate.projection_ids.size(); i++) {
-            auto dest = gstate.column_ids[gstate.projection_ids[i]];
-            if (dest == 0)
-                FlatVector::GetData<uint32_t>(output.data[i])[idx] = coords[0];
-            else if (dest == 1)
-                FlatVector::GetData<uint32_t>(output.data[i])[idx] = coords[1];
-            else if (dest == 2)
-                FlatVector::GetData<double>(output.data[i])[idx] = val;
+    // for dest == 1 and 2
+    for (uint32_t i = 0; i < gstate.projection_ids.size(); i++) {
+        auto dest = gstate.column_ids[gstate.projection_ids[i]];
+        if (dest == 0) {
+            auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
+            for (uint64_t idx = 0; idx < local_remains; idx++) {
+                uint32_t buf_idx = gstate.cell_idx + idx;
+                uint32_t coord = buf_idx / data.tile_size[1];
+                vec[idx] = coord;
+            }
+        } else if (dest == 1) {
+            auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
+            for (uint64_t idx = 0; idx < local_remains; idx++) {
+                uint32_t buf_idx = gstate.cell_idx + idx;
+                uint32_t coord = buf_idx % data.tile_size[1];
+                vec[idx] = coord;
+            }
+        } else if (dest == 2) {
+            auto vec = FlatVector::GetData<double>(output.data[i]);
+            memcpy(vec, pagevals + gstate.cell_idx,
+                   sizeof(double) * local_remains);
         }
-
-        // std::cout << "\t[Put2DData] idx: " << idx << ", x: " << coords[0] <<
-        // ", y: " << coords[1] << ", val: " << val << std::endl;
-        free(coords);
     }
+
 
     gstate.cell_idx += local_remains;
     return local_remains;
