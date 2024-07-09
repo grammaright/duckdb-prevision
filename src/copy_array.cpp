@@ -57,6 +57,10 @@ GlobalWriteArrayData::GlobalWriteArrayData(ClientContext &context,
     } else if (dynamic_cast<COOToArrayWriteArrayData *>(&data)) {
         writer = make_uniq<COOToArrayCopyArrayWriter>();
     }
+
+    // disable preemptive eviction for future array access (e.g., another table
+    // or array queries)
+    BF_DisablePE(arrname_char);
 }
 
 DenseToTileCopyArrayWriter::DenseToTileCopyArrayWriter(
