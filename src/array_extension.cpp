@@ -1,76 +1,122 @@
 #define DUCKDB_EXTENSION_MAIN
 
+#include "array_extension.hpp"
+
+#include <sys/stat.h>
+
+#include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
+
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
+#include "duckdb/function/copy_function.hpp"
 #include "duckdb/function/scalar_function.hpp"
 #include "duckdb/main/extension_util.hpp"
-#include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
-#include "duckdb/function/copy_function.hpp"
 #include "duckdb/parser/parsed_data/copy_info.hpp"
 
-#include "array_extension.hpp"
-#include <sys/stat.h>
-
-extern "C"
-{
+extern "C" {
 #include "bf.h"
+
+extern unsigned long long bftime, bf_this_query;
+
+extern unsigned long long bf_tmpbuf_cnt;
+// extern unsigned long long malloc_time;
+extern unsigned long long bf_read_io_time, bf_iread_io_time, bf_read_io_size,
+    bf_iread_io_size;
+extern unsigned long long bf_write_io_time, bf_write_io_size;
+extern unsigned long long bf_getbuf_cnt_hit, bf_getbuf_cnt_total;
+extern unsigned long long bf_getbuf_io_hit, bf_getbuf_io_total;
+extern unsigned long long bf_min_sl_update_time, bf_min_fl_retrival_time;
 }
 
-namespace duckdb
-{
+namespace duckdb {
 
-	bool IsBFInitialized()
-	{
-		struct stat buf;
-		int ret = stat("/dev/shm/buffertile_bf", &buf);
-		return (ret == 0);
-	}
+bool IsBFInitialized() {
+    struct stat buf;
+    int ret = stat("/dev/shm/buffertile_bf", &buf);
+    return (ret == 0);
+}
 
-	void ArrayExtension::Load(DuckDB &db)
-	{
-		std::cerr << "ArrayExtension::Load()" << std::endl;
+void ArrayExtension::Load(DuckDB &db) {
+    std::cerr << "ArrayExtension::Load()" << std::endl;
 
-		if (!IsBFInitialized())
-		{
-			// It will run only if in the development of DuckDB extension
-			BF_Init();
-			fprintf(stderr, "[ARRAY_EXT] BF_Init() is called because bf has not been initialized.\n");
-		}
+    if (!IsBFInitialized()) {
+        // It will run only if in the development of DuckDB extension
+        BF_Init();
+        fprintf(stderr,
+                "[ARRAY_EXT] BF_Init() is called because bf has not been "
+                "initialized.\n");
+    }
 
-		BF_Attach();
+    BF_Attach();
 
-		std::cerr << "define funtions" << std::endl;
-		auto table_function = ArrayExtension::GetTableFunction();
-		auto copy_function = ArrayExtension::GetCopyFunction();
+    std::cerr << "define funtions" << std::endl;
+    auto table_function = ArrayExtension::GetTableFunction();
+    auto copy_function = ArrayExtension::GetCopyFunction();
 
-		std::cerr << "Registering functions" << std::endl;
-		ExtensionUtil::RegisterFunction(*db.instance, table_function);
-		ExtensionUtil::RegisterFunction(*db.instance, copy_function);
-	}
-	std::string ArrayExtension::Name()
-	{
-		std::cout << "ArrayExtension::Name()" << std::endl;
-		return "array";
-	}
+    std::cerr << "Registering functions" << std::endl;
+    ExtensionUtil::RegisterFunction(*db.instance, table_function);
+    ExtensionUtil::RegisterFunction(*db.instance, copy_function);
+}
+std::string ArrayExtension::Name() {
+    std::cout << "ArrayExtension::Name()" << std::endl;
+    return "array";
+}
 
-} // namespace duckdb
+void ArrayExtension::ResetPVBufferStats() {
+    bftime = 0;
+    bf_this_query = 0;
+    bf_tmpbuf_cnt = 0;
+    //   malloc_time = 0;
+    bf_read_io_time = 0;
+    bf_iread_io_time = 0;
+    bf_read_io_size = 0;
+    bf_iread_io_size = 0;
+    bf_write_io_time = 0;
+    bf_write_io_size = 0;
+    bf_getbuf_cnt_hit = 0;
+    bf_getbuf_cnt_total = 0;
+    bf_getbuf_io_hit = 0;
+    bf_getbuf_io_total = 0;
+    bf_min_sl_update_time = 0;
+    bf_min_fl_retrival_time = 0;
+}
 
-extern "C"
-{
-	DUCKDB_EXTENSION_API void array_init(duckdb::DatabaseInstance &db)
-	{
-		std::cout << "array_init()" << std::endl;
+void ArrayExtension::PrintPVBufferStats() {
+    std::cerr << "total\tbf\tio_r\tio_w"
+                 "\tphit\tpreq\tflgen\tflget\tsl\tdelhint\tpureplan\n"
+              << std::endl;
+    std::cerr << bf_this_query << "\t" << bftime << "\t" << bf_read_io_time
+              << "\t" << bf_write_io_time << "\t" << bf_getbuf_cnt_hit << "\t"
+              << bf_getbuf_cnt_total << "\t" << bf_min_fl_retrival_time << "\t"
+              << bf_min_sl_update_time << "\t" << 0 << "\t" << 0 << "\t" << 0
+              << std::endl;
+    // printf("%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\n", bf_this_query,
+    //        bftime, bf_read_io_time, bf_write_io_time, bf_getbuf_cnt_hit,
+    //        bf_getbuf_cnt_total, bf_min_fl_retrival_time,
+    //        bf_min_sl_update_time);
+    std::cerr << "0\t0\t" << bf_read_io_size << "\t" << bf_write_io_size << "\t"
+              << bf_getbuf_io_hit << "\t" << bf_getbuf_io_total << "\t0\t0\t0"
+              << std::endl;
+    // printf("%d\t%d\t%lld\t%lld\t%lld\t%lld\t%d\t%d\t%d\n", 0, 0,
+    //        bf_read_io_size, bf_write_io_size, bf_getbuf_io_hit,
+    //        bf_getbuf_io_total, 0, 0);
+}
 
-		duckdb::DuckDB db_wrapper(db);
-		db_wrapper.LoadExtension<duckdb::ArrayExtension>();
-	}
+}  // namespace duckdb
 
-	DUCKDB_EXTENSION_API const char *array_version()
-	{
-		std::cout << "array_version()" << std::endl;
-		return duckdb::DuckDB::LibraryVersion();
-	}
+extern "C" {
+DUCKDB_EXTENSION_API void array_init(duckdb::DatabaseInstance &db) {
+    std::cout << "array_init()" << std::endl;
+
+    duckdb::DuckDB db_wrapper(db);
+    db_wrapper.LoadExtension<duckdb::ArrayExtension>();
+}
+
+DUCKDB_EXTENSION_API const char *array_version() {
+    std::cout << "array_version()" << std::endl;
+    return duckdb::DuckDB::LibraryVersion();
+}
 }
 
 #ifndef DUCKDB_EXTENSION_MAIN

@@ -61,6 +61,8 @@ GlobalWriteArrayData::GlobalWriteArrayData(ClientContext &context,
     // disable preemptive eviction for future array access (e.g., another table
     // or array queries)
     BF_DisablePE(arrname_char);
+
+    ArrayExtension::ResetPVBufferStats();
 }
 
 DenseToTileCopyArrayWriter::DenseToTileCopyArrayWriter(

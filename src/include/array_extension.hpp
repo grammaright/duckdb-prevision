@@ -2,17 +2,18 @@
 
 #include "duckdb.hpp"
 
-namespace duckdb
-{
+namespace duckdb {
 
-	class ArrayExtension : public Extension
-	{
-	public:
-		void Load(DuckDB &db) override;
-		std::string Name() override;
+class ArrayExtension : public Extension {
+   public:
+    void Load(DuckDB &db) override;
+    std::string Name() override;
 
-		static TableFunction GetTableFunction();
-		static CopyFunction GetCopyFunction();
-	};
+    static TableFunction GetTableFunction();
+    static CopyFunction GetCopyFunction();
 
-} // namespace duckdb
+    static void ResetPVBufferStats();
+    static void PrintPVBufferStats();
+};
+
+}  // namespace duckdb

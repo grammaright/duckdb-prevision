@@ -65,9 +65,13 @@ struct ArrayReadGlobalState : public GlobalTableFunctionState {
         column_ids.assign(input.column_ids.begin(), input.column_ids.end());
         projection_ids.assign(input.projection_ids.begin(),
                               input.projection_ids.end());
+
+        ArrayExtension::ResetPVBufferStats();
     };
 
-    ~ArrayReadGlobalState(){};
+    ~ArrayReadGlobalState() {
+        ArrayExtension::PrintPVBufferStats();
+    };
 
    public:
     uint64_t cell_idx;
