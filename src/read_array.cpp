@@ -66,10 +66,35 @@ struct ArrayReadGlobalState : public GlobalTableFunctionState {
         projection_ids.assign(input.projection_ids.begin(),
                               input.projection_ids.end());
 
+        // get buffer
+        auto dcoords = make_uniq_array<uint64_t>(2);
+        for (uint32_t idx = 0; idx < data.dim_len; idx++) {
+            dcoords[idx] = current_coords_in_tile[idx];
+        }
+        auto arrname = data.arrayname.c_str();
+        _arrname_char = new char[1024];  // for char*
+        strcpy(_arrname_char, arrname);
+
+        // TODO: Consider sparse tile in the future
+        array_key key = {_arrname_char, dcoords.get(), 2, BF_EMPTYTILE_DENSE};
+
+        if (BF_GetBuf(key, &page) != BFE_OK) {
+            throw InternalException("Failed to get buffer");
+        }
+
         ArrayExtension::ResetPVBufferStats();
     };
 
     ~ArrayReadGlobalState() {
+        auto dcoords = make_uniq_array<uint64_t>(2);
+        for (uint32_t idx = 0; idx < 2; idx++) {
+            dcoords[idx] = current_coords_in_tile[idx];
+        }
+
+        array_key key = {_arrname_char, dcoords.get(), 2, BF_EMPTYTILE_DENSE};
+        BF_UnpinBuf(key);
+        delete _arrname_char;
+
         ArrayExtension::PrintPVBufferStats();
     };
 
@@ -77,10 +102,14 @@ struct ArrayReadGlobalState : public GlobalTableFunctionState {
     uint64_t cell_idx;
     vector<uint64_t> current_coords_in_tile;
     bool finished;
+    PFpage *page;
 
     // table function related:
     vector<column_t> column_ids;
     vector<idx_t> projection_ids;
+
+   private:
+    char *_arrname_char;
 };
 
 struct ArrayReadLocalState : public LocalTableFunctionState {
@@ -121,7 +150,6 @@ uint64_t Put2DData(optional_ptr<const FunctionData> bind_data,
                    sizeof(double) * local_remains);
         }
     }
-
 
     gstate.cell_idx += local_remains;
     return local_remains;
@@ -319,34 +347,13 @@ static void ReadArrayFunction(ClientContext &context,
         return;
     }
 
-    // otherwise, read the current tile
-    auto dcoords = make_uniq_array<uint64_t>(2);
-    for (uint32_t idx = 0; idx < data.dim_len; idx++) {
-        dcoords[idx] = gstate.current_coords_in_tile[idx];
-    }
-    auto arrname = data.arrayname.c_str();
-    // why allocate newly?
-    char *arrname_char = new char[1024];
-    strcpy(arrname_char, arrname);
-
-    // TODO: Consider sparse tile in the future
-    array_key key = {arrname_char, dcoords.get(), 2, BF_EMPTYTILE_DENSE};
-
-    PFpage *page;
-    if (BF_GetBuf(key, &page) != BFE_OK) {
-        throw InternalException("Failed to get buffer");
-    }
-
-    auto size = page->pagebuf_len / sizeof(double);
-    double *pagevals = (double *)bf_util_get_pagebuf(page);
+    auto size = gstate.page->pagebuf_len / sizeof(double);
+    double *pagevals = (double *)bf_util_get_pagebuf(gstate.page);
 
     uint64_t read = PutData(data_p.bind_data, gstate, pagevals, size, output);
 
     output.SetCardinality(read);
     output.Verify();
-
-    BF_UnpinBuf(key);
-    delete arrname_char;
 
     // move the current_coords_in_tile to the next tile
     if (gstate.cell_idx < size) return;
