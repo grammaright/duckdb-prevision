@@ -88,7 +88,8 @@ void GlobalWriteArrayData::pin(vector<uint64_t> _tile_coords) {
     key = {arrname_char, tile_coords, dim_len, BF_EMPTYTILE_DENSE};
 
     PFpage *page;
-    assert(BF_GetBuf(key, &page) == BFE_OK);
+    int res = BF_GetBuf(key, &page);
+    assert(res == BFE_OK);
 
     buf_size = page->pagebuf_len / sizeof(double);
     buf = (double *)bf_util_get_pagebuf(page);
