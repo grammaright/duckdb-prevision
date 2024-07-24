@@ -18,7 +18,7 @@ include_directories(src/include)
 include_directories("$ENV{PREVISION_PATH}/tilestore/include")
 include_directories("$ENV{PREVISION_PATH}/buffertile/include")
 
-set(EXTENSION_SOURCES src/array_extension.cpp src/read_array.cpp src/copy_array.cpp)
+set(EXTENSION_SOURCES src/array_extension.cpp src/read_array.cpp src/copy_array.cpp src/arr2tbl_converter.cpp src/coo2tbl_converter.cpp)
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})
