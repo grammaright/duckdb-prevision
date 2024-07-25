@@ -28,7 +28,7 @@ extern "C" {
 }
 
 namespace duckdb {
-class ArrayToTableConverter {
+class ArrayReader {
    public:
     static uint64_t PutData(optional_ptr<const FunctionData> bind_data,
                             ArrayReadGlobalState &gstate, double *pagevals,

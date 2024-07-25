@@ -1,12 +1,12 @@
 
-#include "coo2tbl_converter.hpp"
+#include "coo_reader.hpp"
 
 namespace duckdb {
 const uint64_t TOTAL_COO_NUM_COLUMNS = 3;
 
-uint64_t COOToTableConverter::_PutData(
-    optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t num_rows, DataChunk &output) {
+uint64_t CooReader::_PutData(optional_ptr<const FunctionData> bind_data,
+                             ArrayReadGlobalState &gstate, double *pagevals,
+                             uint64_t num_rows, DataChunk &output) {
     // auto &data = bind_data->Cast<ArrayReadData>();
 
     auto total_remains =
@@ -39,9 +39,10 @@ uint64_t COOToTableConverter::_PutData(
     return local_remains;
 }
 
-uint64_t COOToTableConverter::_PutDataNoPrune(
-    optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t num_rows, DataChunk &output) {
+uint64_t CooReader::_PutDataNoPrune(optional_ptr<const FunctionData> bind_data,
+                                    ArrayReadGlobalState &gstate,
+                                    double *pagevals, uint64_t num_rows,
+                                    DataChunk &output) {
     // auto &data = bind_data->Cast<ArrayReadData>();
 
     auto total_remains = num_rows - (gstate.cell_idx / TOTAL_COO_NUM_COLUMNS);
@@ -74,7 +75,7 @@ uint64_t COOToTableConverter::_PutDataNoPrune(
     return local_remains;
 }
 
-uint64_t COOToTableConverter::_PutDataNoPruneAndProjection(
+uint64_t CooReader::_PutDataNoPruneAndProjection(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
     double *pagevals, uint64_t num_rows, DataChunk &output) {
     // auto &data = bind_data->Cast<ArrayReadData>();
@@ -109,9 +110,9 @@ uint64_t COOToTableConverter::_PutDataNoPruneAndProjection(
     return local_remains;
 }
 
-uint64_t COOToTableConverter::PutData(
-    optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t num_of_cells, DataChunk &output) {
+uint64_t CooReader::PutData(optional_ptr<const FunctionData> bind_data,
+                            ArrayReadGlobalState &gstate, double *pagevals,
+                            uint64_t num_of_cells, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
     // COO must be 2D array

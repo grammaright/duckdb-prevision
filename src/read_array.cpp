@@ -5,9 +5,9 @@
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 #include <thread>
 
-#include "arr2tbl_converter.hpp"
 #include "array_extension.hpp"
-#include "coo2tbl_converter.hpp"
+#include "array_reader.hpp"
+#include "coo_reader.hpp"
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
@@ -37,15 +37,14 @@ static void ReadArrayFunction(ClientContext &context,
 
     if (data.is_coo_array) {
         // TODO: Multi-tile array is not tested
-        uint64_t read =
-            COOToTableConverter::PutData(data_p.bind_data, gstate, pagevals,
-                                         size / (data.dim_len + 1), output);
+        uint64_t read = CooReader::PutData(data_p.bind_data, gstate, pagevals,
+                                           size / (data.dim_len + 1), output);
 
         output.SetCardinality(read);
         output.Verify();
     } else {
-        uint64_t read = ArrayToTableConverter::PutData(data_p.bind_data, gstate,
-                                                       pagevals, size, output);
+        uint64_t read = ArrayReader::PutData(data_p.bind_data, gstate, pagevals,
+                                             size, output);
 
         output.SetCardinality(read);
         output.Verify();

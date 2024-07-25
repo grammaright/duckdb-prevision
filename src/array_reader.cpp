@@ -1,10 +1,10 @@
 
-#include "arr2tbl_converter.hpp"
+#include "array_reader.hpp"
 
 namespace duckdb {
-uint64_t ArrayToTableConverter::_Put2DData(
-    optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+uint64_t ArrayReader::_Put2DData(optional_ptr<const FunctionData> bind_data,
+                                 ArrayReadGlobalState &gstate, double *pagevals,
+                                 uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
     auto total_remains = size - gstate.cell_idx;
@@ -40,7 +40,7 @@ uint64_t ArrayToTableConverter::_Put2DData(
     return local_remains;
 }
 
-uint64_t ArrayToTableConverter::_Put2DDataNoPrune(
+uint64_t ArrayReader::_Put2DDataNoPrune(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
     double *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
@@ -75,7 +75,7 @@ uint64_t ArrayToTableConverter::_Put2DDataNoPrune(
     return local_remains;
 }
 
-uint64_t ArrayToTableConverter::_Put2DDataNoPruneAndProjection(
+uint64_t ArrayReader::_Put2DDataNoPruneAndProjection(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
     double *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
@@ -110,9 +110,9 @@ uint64_t ArrayToTableConverter::_Put2DDataNoPruneAndProjection(
     return local_remains;
 }
 
-uint64_t ArrayToTableConverter::_Put1DData(
-    optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+uint64_t ArrayReader::_Put1DData(optional_ptr<const FunctionData> bind_data,
+                                 ArrayReadGlobalState &gstate, double *pagevals,
+                                 uint64_t size, DataChunk &output) {
     auto total_remains = size - gstate.cell_idx;
     auto local_remains =
         std::min((uint64_t)STANDARD_VECTOR_SIZE, total_remains);
@@ -137,7 +137,7 @@ uint64_t ArrayToTableConverter::_Put1DData(
     return local_remains;
 }
 
-uint64_t ArrayToTableConverter::_Put1DDataNoPrune(
+uint64_t ArrayReader::_Put1DDataNoPrune(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
     double *pagevals, uint64_t size, DataChunk &output) {
     auto total_remains = size - gstate.cell_idx;
@@ -164,7 +164,7 @@ uint64_t ArrayToTableConverter::_Put1DDataNoPrune(
     return local_remains;
 }
 
-uint64_t ArrayToTableConverter::_Put1DDataNoPruneAndProjection(
+uint64_t ArrayReader::_Put1DDataNoPruneAndProjection(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
     double *pagevals, uint64_t size, DataChunk &output) {
     auto total_remains = size - gstate.cell_idx;
@@ -196,9 +196,9 @@ uint64_t ArrayToTableConverter::_Put1DDataNoPruneAndProjection(
     return local_remains;
 }
 
-uint64_t ArrayToTableConverter::PutData(
-    optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+uint64_t ArrayReader::PutData(optional_ptr<const FunctionData> bind_data,
+                              ArrayReadGlobalState &gstate, double *pagevals,
+                              uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
     if (data.dim_len == 2) {
