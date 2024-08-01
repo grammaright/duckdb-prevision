@@ -80,9 +80,9 @@ void GlobalWriteArrayData::pin(vector<uint64_t> _tile_coords) {
     assert(!is_pinned);
 
     // getbuffer
-    assert(_tile_coords.size() == 2);
-    tile_coords[0] = _tile_coords[0];
-    tile_coords[1] = _tile_coords[1];
+    for (uint32_t i = 0; i < this->dim_len; i++) {
+        tile_coords[i] = _tile_coords[i];
+    }
 
     // TODO: Consider sparse tile in the future
     key = {arrname_char, tile_coords, dim_len, BF_EMPTYTILE_DENSE};
@@ -115,7 +115,8 @@ static unique_ptr<FunctionData> WriteArrayBind(
     ClientContext &context, CopyFunctionBindInput &input,
     const vector<string> &names, const vector<LogicalType> &sql_types) {
     ArrayCopyFunctionExecutionMode mode = COO_TO_ARRAY;
-    uint64_t x, y;
+    uint64_t x, y, z;
+    uint32_t dim_len = 0;
 
     // check all the options in the copy info
     for (auto &option : input.info.options) {
@@ -124,6 +125,7 @@ static unique_ptr<FunctionData> WriteArrayBind(
             for (auto incoord : incoords) {
                 auto val = incoord.GetValue<uint64_t>();
                 x = val;
+                dim_len = (dim_len > 1) ? dim_len : 1;
                 break;  // I don't know why it gives a vector
             }
         } else if (option.first == "COORD_Y") {
@@ -131,6 +133,15 @@ static unique_ptr<FunctionData> WriteArrayBind(
             for (auto incoord : incoords) {
                 auto val = incoord.GetValue<uint64_t>();
                 y = val;
+                dim_len = (dim_len > 2) ? dim_len : 2;
+                break;  // I don't know why it gives a vector
+            }
+        } else if (option.first == "COORD_Z") {
+            auto incoords = option.second;
+            for (auto incoord : incoords) {
+                auto val = incoord.GetValue<uint64_t>();
+                z = val;
+                dim_len = (dim_len > 3) ? dim_len : 3;
                 break;  // I don't know why it gives a vector
             }
         } else if (option.first == "MODE") {
@@ -155,7 +166,19 @@ static unique_ptr<FunctionData> WriteArrayBind(
         return std::move(bind_data);
     } else {
         auto file_path = input.info.file_path;
-        auto tile_coords = vector<uint64_t>{x, y};
+
+        vector<uint64_t> tile_coords;
+        if (dim_len == 1) {
+            tile_coords.push_back(x);
+        } else if (dim_len == 2) {
+            tile_coords.push_back(x);
+            tile_coords.push_back(y);
+        } else if (dim_len == 3) {
+            tile_coords.push_back(x);
+            tile_coords.push_back(y);
+            tile_coords.push_back(z);
+        }
+
         auto bind_data =
             make_uniq<DenseToTileWriteArrayData>(file_path, tile_coords);
         return std::move(bind_data);
