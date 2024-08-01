@@ -51,9 +51,9 @@ void ArrayExtension::Load(DuckDB &db) {
     BF_Attach();
 
     std::cerr << "define funtions" << std::endl;
-    auto table_function = ArrayExtension::GetTableFunction();
+    auto table_function = ArrayExtension::GetReadArrayFunction();
     auto copy_function = ArrayExtension::GetCopyFunction();
-    auto scalar_function = ArrayExtension::GetScalarFunction();
+    auto scalar_function = ArrayExtension::GetCreateArrayFunction();
 
     std::cerr << "Registering functions" << std::endl;
     ExtensionUtil::RegisterFunction(*db.instance, table_function);

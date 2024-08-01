@@ -149,7 +149,7 @@ double ReadArrayProgress(ClientContext &context, const FunctionData *bind_data,
     return progress;
 }
 
-TableFunction ArrayExtension::GetTableFunction() {
+TableFunction ArrayExtension::GetReadArrayFunction() {
     TableFunction function = TableFunction(
         "read_array",
         {LogicalType::VARCHAR, LogicalType::LIST(LogicalType::INTEGER)},
@@ -167,4 +167,5 @@ TableFunction ArrayExtension::GetTableFunction() {
 
     return function;
 }
+
 }  // namespace duckdb

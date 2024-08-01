@@ -81,7 +81,7 @@ void CreateArrayScalarFunction(DataChunk &args, ExpressionState &state,
                                            [&](string_t name) { return true; });
 }
 
-ScalarFunction ArrayExtension::GetScalarFunction() {
+ScalarFunction ArrayExtension::GetCreateArrayFunction() {
     // this function should be called only once like "SELECT create_array(...)"
     ScalarFunction function = ScalarFunction(
         "create_array",

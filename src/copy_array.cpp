@@ -304,7 +304,7 @@ CopyFunction ArrayExtension::GetCopyFunction() {
     info.plan = nullptr;
 
     info.copy_from_bind = nullptr;
-    info.copy_from_function = ArrayExtension::GetTableFunction();
+    info.copy_from_function = ArrayExtension::GetReadArrayFunction();
 
     info.extension = "tilestore";
 

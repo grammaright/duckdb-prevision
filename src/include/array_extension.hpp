@@ -9,9 +9,9 @@ class ArrayExtension : public Extension {
     void Load(DuckDB &db) override;
     std::string Name() override;
 
-    static TableFunction GetTableFunction();
+    static TableFunction GetReadArrayFunction();
     static CopyFunction GetCopyFunction();
-    static ScalarFunction GetScalarFunction();
+    static ScalarFunction GetCreateArrayFunction();
 
     static void ResetPVBufferStats();
     static void PrintPVBufferStats();
