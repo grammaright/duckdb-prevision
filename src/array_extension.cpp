@@ -53,10 +53,12 @@ void ArrayExtension::Load(DuckDB &db) {
     std::cerr << "define funtions" << std::endl;
     auto table_function = ArrayExtension::GetTableFunction();
     auto copy_function = ArrayExtension::GetCopyFunction();
+    auto scalar_function = ArrayExtension::GetScalarFunction();
 
     std::cerr << "Registering functions" << std::endl;
     ExtensionUtil::RegisterFunction(*db.instance, table_function);
     ExtensionUtil::RegisterFunction(*db.instance, copy_function);
+    ExtensionUtil::RegisterFunction(*db.instance, scalar_function);
 }
 std::string ArrayExtension::Name() {
     std::cout << "ArrayExtension::Name()" << std::endl;
@@ -91,16 +93,9 @@ void ArrayExtension::PrintPVBufferStats() {
               << bf_getbuf_cnt_total << "\t" << bf_min_fl_retrival_time << "\t"
               << bf_min_sl_update_time << "\t" << 0 << "\t" << 0 << "\t" << 0
               << std::endl;
-    // printf("%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\t%lld\n", bf_this_query,
-    //        bftime, bf_read_io_time, bf_write_io_time, bf_getbuf_cnt_hit,
-    //        bf_getbuf_cnt_total, bf_min_fl_retrival_time,
-    //        bf_min_sl_update_time);
     std::cerr << "0\t0\t" << bf_read_io_size << "\t" << bf_write_io_size << "\t"
               << bf_getbuf_io_hit << "\t" << bf_getbuf_io_total << "\t0\t0\t0"
               << std::endl;
-    // printf("%d\t%d\t%lld\t%lld\t%lld\t%lld\t%d\t%d\t%d\n", 0, 0,
-    //        bf_read_io_size, bf_write_io_size, bf_getbuf_io_hit,
-    //        bf_getbuf_io_total, 0, 0);
 }
 
 }  // namespace duckdb
