@@ -75,10 +75,9 @@ void CreateArrayScalarFunction(DataChunk &args, ExpressionState &state,
         throw InternalException("Failed to create array");
     }
 
-    // FlatVector::GetData<bool>(result)[0] = true;
-
-    UnaryExecutor::Execute<string_t, bool>(args.data[0], result, args.size(),
-                                           [&](string_t name) { return true; });
+    auto vec = FlatVector::GetData<bool>(result);
+    vec[0] = true;
+    result.SetVectorType(VectorType::CONSTANT_VECTOR);
 }
 
 ScalarFunction ArrayExtension::GetCreateArrayFunction() {
