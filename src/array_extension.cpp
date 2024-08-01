@@ -54,12 +54,29 @@ void ArrayExtension::Load(DuckDB &db) {
     auto table_function = ArrayExtension::GetReadArrayFunction();
     auto copy_function = ArrayExtension::GetCopyFunction();
     auto scalar_function = ArrayExtension::GetCreateArrayFunction();
+    auto bfree_function = ArrayExtension::GetBfFreeFunction();
 
     std::cerr << "Registering functions" << std::endl;
     ExtensionUtil::RegisterFunction(*db.instance, table_function);
     ExtensionUtil::RegisterFunction(*db.instance, copy_function);
     ExtensionUtil::RegisterFunction(*db.instance, scalar_function);
+    ExtensionUtil::RegisterFunction(*db.instance, bfree_function);
 }
+
+void BFFreeFunction(DataChunk &args, ExpressionState &state, Vector &result) {
+    BF_Detach();
+    BF_Free();
+
+    // Do nothing
+    auto vec = FlatVector::GetData<bool>(result);
+    vec[0] = true;
+    result.SetVectorType(VectorType::CONSTANT_VECTOR);
+}
+
+ScalarFunction ArrayExtension::GetBfFreeFunction() {
+    return ScalarFunction("bf_free", {}, LogicalType::BOOLEAN, BFFreeFunction);
+}
+
 std::string ArrayExtension::Name() {
     std::cout << "ArrayExtension::Name()" << std::endl;
     return "array";

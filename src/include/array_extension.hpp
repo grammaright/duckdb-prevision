@@ -12,6 +12,7 @@ class ArrayExtension : public Extension {
     static TableFunction GetReadArrayFunction();
     static CopyFunction GetCopyFunction();
     static ScalarFunction GetCreateArrayFunction();
+    static ScalarFunction GetBfFreeFunction();
 
     static void ResetPVBufferStats();
     static void PrintPVBufferStats();
