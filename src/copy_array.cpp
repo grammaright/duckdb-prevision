@@ -2,9 +2,7 @@
 
 #include "array_extension.hpp"
 
-extern "C" {
-#include "bf.h"
-}
+#include "buffer/bf.h"
 
 namespace duckdb {
 COOToArrayWriteArrayData::COOToArrayWriteArrayData(string file_path)

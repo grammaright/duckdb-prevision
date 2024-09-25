@@ -13,9 +13,7 @@
 #include "duckdb/main/extension_util.hpp"
 #include "read_array.hpp"
 
-extern "C" {
-#include "bf.h"
-}
+#include "buffer/bf.h"
 
 namespace duckdb {
 

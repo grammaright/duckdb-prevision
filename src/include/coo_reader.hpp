@@ -23,9 +23,7 @@
 #include "duckdb/parser/parsed_data/copy_info.hpp"
 #include "read_array.hpp"
 
-extern "C" {
-#include "bf.h"
-}
+#include "buffer/bf.h"
 
 namespace duckdb {
 class CooReader {

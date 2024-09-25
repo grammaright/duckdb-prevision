@@ -15,8 +15,9 @@ project(${TARGET_NAME})
 include_directories(src/include)
 
 # TileStore & BF
-include_directories("$ENV{PREVISION_PATH}/tilestore/include")
-include_directories("$ENV{PREVISION_PATH}/buffertile/include")
+# include_directories("$ENV{PREVISION_PATH}/tilestore/include")
+# include_directories("$ENV{PREVISION_PATH}/buffertile/include")
+include_directories("$ENV{PREVISION_PATH}/src/include")
 
 set(EXTENSION_SOURCES src/array_extension.cpp
                       src/read_array.cpp src/copy_array.cpp src/array_reader.cpp src/coo_reader.cpp src/create_array.cpp)
@@ -29,13 +30,24 @@ target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 
 # TileStore & BF
-target_link_libraries(${EXTENSION_NAME} "$ENV{PREVISION_PATH}/buffertile/lib/libbf.a")
-target_link_libraries(${EXTENSION_NAME} "$ENV{PREVISION_PATH}/tilestore/lib/libtilestore.a")
+# target_link_libraries(${EXTENSION_NAME} "$ENV{PREVISION_PATH}/buffertile/lib/libbf.a")
+# target_link_libraries(${EXTENSION_NAME} "$ENV{PREVISION_PATH}/tilestore/lib/libtilestore.a")
+target_link_libraries(${EXTENSION_NAME} "$ENV{PREVISION_PATH}/build/libprevision_lib.a")
 target_link_libraries(${EXTENSION_NAME} -lrt)
 
-target_link_libraries(${LOADABLE_EXTENSION_NAME} "$ENV{PREVISION_PATH}/buffertile/lib/libbf.a")
-target_link_libraries(${LOADABLE_EXTENSION_NAME} "$ENV{PREVISION_PATH}/tilestore/lib/libtilestore.a")
+# target_link_libraries(${LOADABLE_EXTENSION_NAME} "$ENV{PREVISION_PATH}/buffertile/lib/libbf.a")
+# target_link_libraries(${LOADABLE_EXTENSION_NAME} "$ENV{PREVISION_PATH}/tilestore/lib/libtilestore.a")
+target_link_libraries(${LOADABLE_EXTENSION_NAME} "$ENV{PREVISION_PATH}/build/libprevision_lib.a")
 target_link_libraries(${LOADABLE_EXTENSION_NAME} -lrt)
+
+# Find BLAS
+find_package(BLAS REQUIRED)
+if(BLAS_FOUND)
+    include_directories(${BLAS_INCLUDE_DIRS})
+    target_link_libraries(${EXTENSION_NAME} ${BLAS_LIBRARIES})
+else()
+    message(FATAL_ERROR "OpenBLAS not found.")
+endif()
 
 install(
   TARGETS ${EXTENSION_NAME}

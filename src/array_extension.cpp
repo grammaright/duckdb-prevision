@@ -14,8 +14,7 @@
 #include "duckdb/main/extension_util.hpp"
 #include "duckdb/parser/parsed_data/copy_info.hpp"
 
-extern "C" {
-#include "bf.h"
+#include "buffer/bf.h"
 
 extern unsigned long long bftime, bf_this_query;
 
@@ -27,7 +26,6 @@ extern unsigned long long bf_write_io_time, bf_write_io_size;
 extern unsigned long long bf_getbuf_cnt_hit, bf_getbuf_cnt_total;
 extern unsigned long long bf_getbuf_io_hit, bf_getbuf_io_total;
 extern unsigned long long bf_min_sl_update_time, bf_min_fl_retrival_time;
-}
 
 namespace duckdb {
 

@@ -14,9 +14,7 @@
 #include "duckdb/function/scalar_function.hpp"
 #include "duckdb/main/extension_util.hpp"
 
-extern "C" {
-#include "bf.h"
-}
+#include "buffer/bf.h"
 
 namespace duckdb {
 

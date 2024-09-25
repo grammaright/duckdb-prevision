@@ -22,9 +22,7 @@
 #include "duckdb/main/extension_util.hpp"
 #include "duckdb/parser/parsed_data/copy_info.hpp"
 
-extern "C" {
-#include "bf.h"
-}
+#include "buffer/bf.h"
 
 namespace duckdb {
 typedef enum ArrayCopyFunctionExecutionMode {
