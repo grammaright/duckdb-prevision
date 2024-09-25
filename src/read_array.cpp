@@ -107,8 +107,19 @@ unique_ptr<FunctionData> ReadArrayBind(ClientContext &context,
         names.emplace_back("x");
         names.emplace_back("y");
         names.emplace_back("val");
+    } else if (bind_data->dim_len == 3) {
+        return_types.push_back(LogicalType::UINTEGER);
+        return_types.push_back(LogicalType::UINTEGER);
+        return_types.push_back(LogicalType::UINTEGER);
+        return_types.push_back(LogicalType::DOUBLE);
+
+        names.emplace_back("x");
+        names.emplace_back("y");
+        names.emplace_back("z");
+        names.emplace_back("val");
     } else {
-        throw NotImplementedException("Only 1D and 2D arrays are supported");
+        throw NotImplementedException(
+            "Only 1D, 2D, and 3D arrays are supported");
     }
 
     return std::move(bind_data);

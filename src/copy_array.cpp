@@ -207,38 +207,53 @@ void COOToArrayCopyArrayWriter::WriteArrayData(ExecutionContext &context,
     // We don't know what vector type DuckDB will give
     // So we need to convert it to unified vector format
     // vector type ref: https://youtu.be/bZOvAKGkzpQ?si=ShnWtUDKNIm7ymo8&t=1265
-    input.data[0].Flatten(input.size());  // FIXME: Maybe performance panalty.
-                                          // exploit the vector type
-    input.data[1].Flatten(input.size());
-    input.data[2].Flatten(input.size());
+    for (uint32_t d = 0; d < array_data.dim_len + 1; d++) {
+        input.data[d].Flatten(
+            input.size());  // FIXME: Maybe performance panalty.
+                            // exploit the vector type
+    }
 
-    uint64_t *x = FlatVector::GetData<uint64_t>(input.data[0]);
-    uint64_t *y = FlatVector::GetData<uint64_t>(input.data[1]);
-    double *val = FlatVector::GetData<double>(input.data[2]);
+    double *val = FlatVector::GetData<double>(input.data[array_data.dim_len]);
 
+    uint64_t *tcoords = new uint64_t[array_data.dim_len];
     for (idx_t i = 0; i < input.size(); i++) {
-        uint64_t tx = x[i] / array_data.tile_size[0];
-        uint64_t ty = y[i] / array_data.tile_size[1];
+        uint64_t onedcoord = 0;
+        int64_t base = 1;
+        bool out = false;
+        for (int64_t d = array_data.dim_len - 1; d >= 0; d--) {
+            uint32_t *coord_vec = FlatVector::GetData<uint32_t>(input.data[d]);
+            uint64_t lcoord = (uint64_t)coord_vec[i] % array_data.tile_size[d];
+            tcoords[d] = (uint64_t)coord_vec[i] / array_data.tile_size[d];
+
+            onedcoord += lcoord * base;
+            base *= array_data.tile_size[d];
+
+            if (tcoords[d] != array_gstate.tile_coords[d]) {
+                out = true;
+            }
+        }
         // std::cout << "x: " << x[i] << " (" << tx << "/"
         //           << array_data.tile_size[0] << "), y: " << y[i] << " (" <<
         //           ty
         //           << "/" << array_data.tile_size[1] << ")";
 
-        if (tx != array_gstate.tile_coords[0] ||
-            ty != array_gstate.tile_coords[1]) {
+        if (out) {
             // std::cout << ", unpinning";
             array_gstate.unpin();
         }
 
         if (!array_gstate.is_pinned) {
             // std::cout << ", pinning";
-            array_gstate.pin({tx, ty});
+            array_gstate.pin(
+                vector<uint64_t>(tcoords, tcoords + array_data.dim_len));
         }
 
-        uint64_t idx =
-            (x[i] % array_data.tile_size[0]) * array_data.tile_size[1] +
-            (y[i] % array_data.tile_size[1]);
-        array_gstate.buf[idx] = val[i];
+        array_gstate.buf[onedcoord] = val[i];
+        // reset nullbit if nullable array
+        if (array_gstate.page->type == DENSE_FIXED_NULLABLE ||
+            array_gstate.page->type == SPARSE_FIXED_NULLABLE) {
+            bf_util_reset_cell_null(array_gstate.page, onedcoord);
+        }
 
         // std::cout << ", buf[" << idx << "] = " << val[i] << std::endl;
     }

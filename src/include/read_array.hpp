@@ -68,7 +68,7 @@ struct ArrayReadGlobalState : public GlobalTableFunctionState {
                               input.projection_ids.end());
 
         // get buffer
-        auto dcoords = make_uniq_array<uint64_t>(2);
+        auto dcoords = make_uniq_array<uint64_t>(data.dim_len);
         for (uint32_t idx = 0; idx < data.dim_len; idx++) {
             dcoords[idx] = current_coords_in_tile[idx];
         }
@@ -77,7 +77,8 @@ struct ArrayReadGlobalState : public GlobalTableFunctionState {
         strcpy(_arrname_char, arrname);
 
         // TODO: Consider sparse tile in the future
-        array_key key = {_arrname_char, dcoords.get(), 2, BF_EMPTYTILE_DENSE};
+        array_key key = {_arrname_char, dcoords.get(), data.dim_len,
+                         BF_EMPTYTILE_DENSE};
 
         if (BF_GetBuf(key, &page) != BFE_OK) {
             throw InternalException("Failed to get buffer");
