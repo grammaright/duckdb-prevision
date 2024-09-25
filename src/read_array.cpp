@@ -158,6 +158,23 @@ double ReadArrayProgress(ClientContext &context, const FunctionData *bind_data,
     return progress;
 }
 
+unique_ptr<NodeStatistics> ReadArrayCardinality(ClientContext &context,
+                                                const FunctionData *bind_data) {
+    auto stat = make_uniq<NodeStatistics>();
+    stat->estimated_cardinality = 1;
+
+    auto &array_data = bind_data->Cast<ArrayReadData>();
+    for (uint32_t idx = 0; idx < array_data.dim_len; idx++) {
+        stat->estimated_cardinality *= array_data.tile_size[idx];
+    }
+
+    stat->max_cardinality = stat->estimated_cardinality;
+
+    stat->has_estimated_cardinality = true;
+    stat->has_max_cardinality = true;
+    return std::move(stat);
+}
+
 TableFunction ArrayExtension::GetReadArrayFunction() {
     TableFunction function = TableFunction(
         "read_array",
@@ -170,6 +187,7 @@ TableFunction ArrayExtension::GetReadArrayFunction() {
     function.projection_pushdown = true;
     function.filter_prune = true;
     function.table_scan_progress = ReadArrayProgress;
+    function.cardinality = ReadArrayCardinality;
 
     // function.pushdown_complex_filter = ReadArrayComplexFilterPushdown;
     // TODO: table_function.function_info = std::move(function_info);
