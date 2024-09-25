@@ -85,7 +85,6 @@ void GlobalWriteArrayData::pin(vector<uint64_t> _tile_coords) {
     // TODO: Consider sparse tile in the future
     key = {arrname_char, tile_coords, dim_len, BF_EMPTYTILE_DENSE};
 
-    PFpage *page;
     int res = BF_GetBuf(key, &page);
     assert(res == BFE_OK);
 
@@ -102,6 +101,7 @@ void GlobalWriteArrayData::unpin() {
     BF_TouchBuf(key);
     BF_UnpinBuf(key);
 
+    page = NULL;
     is_pinned = false;
 }
 

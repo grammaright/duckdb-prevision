@@ -90,6 +90,7 @@ struct GlobalWriteArrayData : public GlobalFunctionData {
    public:
     unique_ptr<CopyArrayWriter> writer;
 
+    PFpage *page;
     uint64_t buf_size;
     double *buf;
 

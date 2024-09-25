@@ -202,6 +202,11 @@ uint64_t ArrayReader::PutData(optional_ptr<const FunctionData> bind_data,
     auto &data = bind_data->Cast<ArrayReadData>();
 
     if (data.dim_len == 2) {
+        if (gstate.page->type == DENSE_FIXED_NULLABLE || 
+            gstate.page->type == SPARSE_FIXED_NULLABLE) {
+            throw std::runtime_error("Nullable array is not supported currently");
+        }
+
         if (gstate.projection_ids.size() > 0)  // filter_prune ON
             return _Put2DData(bind_data, gstate, pagevals, size, output);
         else if (gstate.column_ids.size() ==
@@ -211,6 +216,11 @@ uint64_t ArrayReader::PutData(optional_ptr<const FunctionData> bind_data,
             return _Put2DDataNoPruneAndProjection(bind_data, gstate, pagevals,
                                                   size, output);
     } else {
+        if (gstate.page->type == DENSE_FIXED_NULLABLE || 
+            gstate.page->type == SPARSE_FIXED_NULLABLE) {
+            throw std::runtime_error("Nullable array is not supported currently");
+        }
+
         if (gstate.projection_ids.size() > 0)  // filter_prune ON
             return _Put1DData(bind_data, gstate, pagevals, size, output);
         else if (gstate.column_ids.size() ==
