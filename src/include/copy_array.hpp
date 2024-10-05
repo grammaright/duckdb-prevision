@@ -101,6 +101,9 @@ struct GlobalWriteArrayData : public GlobalFunctionData {
    private:
     array_key key;
     char *arrname_char;
+
+    // to check the tile has been pinned to set nullbits
+    set<vector<uint64_t>> pinned_tiles;
 };
 
 struct LocalWriteArrayData : public LocalFunctionData {};

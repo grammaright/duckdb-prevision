@@ -90,6 +90,19 @@ void GlobalWriteArrayData::pin(vector<uint64_t> _tile_coords) {
 
     buf_size = page->pagebuf_len / sizeof(double);
     buf = (double *)bf_util_get_pagebuf(page);
+
+    // nullbits set to 0 if it is the first time to pin the tile  
+    if (page->type == DENSE_FIXED_NULLABLE 
+            || page->type == SPARSE_FIXED_NULLABLE) {
+        bool is_first = pinned_tiles.find(_tile_coords) == pinned_tiles.end();
+        if (is_first) {
+            bf_util_set_nullbits_null(page);
+
+            // push to pinned tiles
+            pinned_tiles.insert(_tile_coords);
+        } 
+    }
+
     is_pinned = true;
 }
 
