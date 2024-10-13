@@ -26,7 +26,7 @@ void CreateArrayScalarFunction(DataChunk &args, ExpressionState &state,
     // auto vec_tilesize = ListVector::GetData(args.data[2]);
     auto vec_type = FlatVector::GetData<string_t>(args.data[3]);
     auto vec_is_sparse = FlatVector::GetData<bool>(args.data[4]);
-    auto vec_is_nullable = FlatVector::GetData<bool>(args.data[4]);
+    auto vec_is_nullable = FlatVector::GetData<bool>(args.data[5]);
 
     // check the vector length is one
     if (args.size() != 1) {
@@ -71,7 +71,7 @@ void CreateArrayScalarFunction(DataChunk &args, ExpressionState &state,
     // create array
     if (tilestore_create_array(
             arrname.c_str(), arr, tile, dim_len, attr_type, format,
-            vec_is_nullable ? TILESTORE_NULLABLE : TILESTORE_NOT_NULLABLE) !=
+            vec_is_nullable[0] ? TILESTORE_NULLABLE : TILESTORE_NOT_NULLABLE) !=
         TILESTORE_OK) {
         throw InternalException("Failed to create array");
     }
@@ -89,7 +89,7 @@ ScalarFunction ArrayExtension::GetCreateArrayFunction() {
             LogicalType::VARCHAR,                     // Array name
             LogicalType::LIST(LogicalType::INTEGER),  // Array size
             LogicalType::LIST(LogicalType::INTEGER),  // Tile size
-            LogicalType::VARCHAR,                     // type
+            LogicalType::VARCHAR,                     // data type
             LogicalType::BOOLEAN,                     // is sparse array?
             LogicalType::BOOLEAN                      // is nullable?
         },
