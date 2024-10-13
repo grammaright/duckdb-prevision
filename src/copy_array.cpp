@@ -48,6 +48,8 @@ GlobalWriteArrayData::GlobalWriteArrayData(ClientContext &context,
     dim_len = data.dim_len;
     tile_coords = new uint64_t[dim_len];
 
+    is_pinned = false;
+
     // if data is instance of COOToArrayWriteArrayData
     if (dynamic_cast<DenseToTileWriteArrayData *>(&data)) {
         auto &array_data = data.Cast<DenseToTileWriteArrayData>();
@@ -220,11 +222,10 @@ void COOToArrayCopyArrayWriter::WriteArrayData(ExecutionContext &context,
     // We don't know what vector type DuckDB will give
     // So we need to convert it to unified vector format
     // vector type ref: https://youtu.be/bZOvAKGkzpQ?si=ShnWtUDKNIm7ymo8&t=1265
-    for (uint32_t d = 0; d < array_data.dim_len + 1; d++) {
-        input.data[d].Flatten(
-            input.size());  // FIXME: Maybe performance panalty.
-                            // exploit the vector type
-    }
+
+    // FIXME: Maybe performance panalty.
+    // exploit the vector type
+    input.Flatten();
 
     double *val = FlatVector::GetData<double>(input.data[array_data.dim_len]);
 
@@ -238,6 +239,8 @@ void COOToArrayCopyArrayWriter::WriteArrayData(ExecutionContext &context,
             uint64_t lcoord = (uint64_t)coord_vec[i] % array_data.tile_size[d];
             tcoords[d] = (uint64_t)coord_vec[i] / array_data.tile_size[d];
 
+            // std::cerr << "d[" << d << "]=" << lcoord << "(" << coord_vec[i] << "),";
+
             onedcoord += lcoord * base;
             base *= array_data.tile_size[d];
 
@@ -245,10 +248,7 @@ void COOToArrayCopyArrayWriter::WriteArrayData(ExecutionContext &context,
                 out = true;
             }
         }
-        // std::cout << "x: " << x[i] << " (" << tx << "/"
-        //           << array_data.tile_size[0] << "), y: " << y[i] << " (" <<
-        //           ty
-        //           << "/" << array_data.tile_size[1] << ")";
+        // std::cerr << " onedcoord=" << onedcoord << ", val=" << val[i] << std::endl;
 
         if (out) {
             // std::cout << ", unpinning";
@@ -270,6 +270,8 @@ void COOToArrayCopyArrayWriter::WriteArrayData(ExecutionContext &context,
 
         // std::cout << ", buf[" << idx << "] = " << val[i] << std::endl;
     }
+
+    delete tcoords;
 }
 
 void DenseToTileCopyArrayWriter::WriteArrayData(ExecutionContext &context,
