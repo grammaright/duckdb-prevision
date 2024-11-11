@@ -79,7 +79,8 @@ struct GlobalWriteArrayData : public GlobalFunctionData {
         // BF_UnpinBuf(key);
         // delete arrname_char;
         // delete dcoords;
-        ArrayExtension::PrintPVBufferStats();
+
+        // ArrayExtension::PrintPVBufferStats();
     }
 
     void pin(vector<uint64_t> tile_coords);

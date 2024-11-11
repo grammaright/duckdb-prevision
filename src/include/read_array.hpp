@@ -50,6 +50,10 @@ struct ArrayReadData : public TableFunctionData {
     uint64_t num_cells;
     uint32_t dim_len;
 
+    // requested coords
+    // it will be set when binding. if empty, read all
+    vector<int> requestedCoords;
+
     bool is_coo_array = false;
 };
 
@@ -59,54 +63,129 @@ struct ArrayReadGlobalState : public GlobalTableFunctionState {
                          TableFunctionInitInput &input) {
         auto &data = input.bind_data->Cast<ArrayReadData>();
 
-        current_coords_in_tile = vector<uint64_t>(data.dim_len, 0);
-        finished = false;
+        isFinished = false;
+        dimLen = data.dim_len;
+        page = NULL;
+        for (int d = 0; d < (int)dimLen; d++) {
+            arrSizeInTile.push_back((int)data.array_size_in_tile[d]);
+        }
+
+        auto arrname = data.arrayname.c_str();
+        _arrname_char = new char[1024];  // for char*
+        strcpy(_arrname_char, arrname);
 
         // copy
         column_ids.assign(input.column_ids.begin(), input.column_ids.end());
         projection_ids.assign(input.projection_ids.begin(),
                               input.projection_ids.end());
 
-        // get buffer
-        auto dcoords = make_uniq_array<uint64_t>(data.dim_len);
-        for (uint32_t idx = 0; idx < data.dim_len; idx++) {
-            dcoords[idx] = current_coords_in_tile[idx];
-        }
-        auto arrname = data.arrayname.c_str();
-        _arrname_char = new char[1024];  // for char*
-        strcpy(_arrname_char, arrname);
-
-        // TODO: Consider sparse tile in the future
-        array_key key = {_arrname_char, dcoords.get(), data.dim_len,
-                         BF_EMPTYTILE_DENSE};
-
-        if (BF_GetBuf(key, &page) != BFE_OK) {
-            throw InternalException("Failed to get buffer");
+        if (data.requestedCoords.size() > 0) {
+            currentCoordsInTile = data.requestedCoords;
+            pin();
+            if (page == NULL) {
+                isFinished = true;
+                unpin();
+            }
+        } else {
+            currentCoordsInTile = vector<int>(data.dim_len, 0);
+            --currentCoordsInTile[data.dim_len - 1];
+            findNextTile();
         }
 
         ArrayExtension::ResetPVBufferStats();
     };
 
+    bool findNextTile() {
+        // find the next tile; this involves pin / unpin
+
+        // loop until find a non-empty tile
+        bool searchDone = false;
+        while (!searchDone) {
+            unpin();
+
+            // find next coordinates and check if finished
+            for (int idx = (int)dimLen - 1; idx >= 0; idx--) {
+                currentCoordsInTile[idx] += 1;
+                if (currentCoordsInTile[idx] < arrSizeInTile[idx]) {
+                    break;
+                }
+
+                currentCoordsInTile[idx] = 0;
+                if (idx == 0) {
+                    // if hit here, all tiles have been searched
+                    isFinished = true;
+                    searchDone = true;
+                }
+            }
+
+            // if found a tile 
+            if (!isFinished) {
+                // reset cell index and pin the tile
+                cell_idx = 0;
+                pin();
+                if (page == NULL) {
+                    // if the tile is empty, keep searching
+                    continue;
+                } else {
+                    // found!
+                    searchDone = true;
+                }
+            } 
+        }
+
+        std::cout << "coords=" << currentCoordsInTile[0] << "," << currentCoordsInTile[1] << "," << currentCoordsInTile[2] << std::endl;
+        return !isFinished;
+    }
+
+
     // FIXME: Why ArrayReadGlobalState() called multiple times?
     ~ArrayReadGlobalState() {}
+
     void free() {
+        unpin();
+        // delete _arrname_char;
+        ArrayExtension::PrintPVBufferStats();
+    };
+
+    void pin() {
+        if (page != NULL) {
+            throw InternalException("Already pinned");
+        }
+
+        // get buffer
+        auto dcoords = make_uniq_array<uint64_t>(dimLen);
+        for (uint32_t idx = 0; idx < dimLen; idx++) {
+            dcoords[idx] = (uint64_t) currentCoordsInTile[idx];
+        }
+        // TODO: Consider sparse tile in the future
+        array_key key = {_arrname_char, dcoords.get(), dimLen,
+                         BF_EMPTYTILE_NONE};
+
+        if (BF_GetBuf(key, &page) != BFE_OK) {
+            throw InternalException("Failed to get buffer");
+        }
+    }
+
+    void unpin() {
+        if (page == NULL) return;
+
         auto dcoords = make_uniq_array<uint64_t>(2);
         for (uint32_t idx = 0; idx < 2; idx++) {
-            dcoords[idx] = current_coords_in_tile[idx];
+            dcoords[idx] = (uint64_t) currentCoordsInTile[idx];
         }
 
         array_key key = {_arrname_char, dcoords.get(), 2, BF_EMPTYTILE_DENSE};
         BF_UnpinBuf(key);
-        // delete _arrname_char;
-
-        ArrayExtension::PrintPVBufferStats();
-    };
+        page = NULL;
+    }
 
    public:
     uint64_t cell_idx;
-    vector<uint64_t> current_coords_in_tile;
-    bool finished;
+    bool isFinished;
     PFpage *page;
+    uint32_t dimLen;
+    vector<int> currentCoordsInTile;
+    vector<int> arrSizeInTile;
 
     // table function related:
     vector<column_t> column_ids;

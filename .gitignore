@@ -7,5 +7,7 @@ testext
 test/python/__pycache__/
 .Rhistory
 
+data
+
 .env
 .vscode

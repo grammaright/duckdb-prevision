@@ -67,6 +67,17 @@ class ArrayReader {
         optional_ptr<const FunctionData> bind_data,
         ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
         DataChunk &output);
+    static uint64_t _Put2DNullableData(optional_ptr<const FunctionData> bind_data,
+                               ArrayReadGlobalState &gstate, double *pagevals,
+                               uint64_t size, DataChunk &output);
+    static uint64_t _Put2DNullableDataNoPrune(
+        optional_ptr<const FunctionData> bind_data,
+        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        DataChunk &output);
+    static uint64_t _Put2DNullableDataNoPruneAndProjection(
+        optional_ptr<const FunctionData> bind_data,
+        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        DataChunk &output);
 
     static uint64_t _Put1DData(optional_ptr<const FunctionData> bind_data,
                                ArrayReadGlobalState &gstate, double *pagevals,

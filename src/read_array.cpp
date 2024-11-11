@@ -18,52 +18,97 @@
 
 namespace duckdb {
 
-static void ReadArrayFunction(ClientContext &context,
-                              TableFunctionInput &data_p, DataChunk &output) {
+static void ReadArrayFunctionWithCoords(ClientContext &context,
+                                        TableFunctionInput &data_p, DataChunk &output) {
     auto &data = data_p.bind_data->Cast<ArrayReadData>();
     auto &gstate = data_p.global_state->Cast<ArrayReadGlobalState>();
 
-    // check if we have already read all the tiles
-    if (gstate.finished) {
+    if (gstate.isFinished) {
+        gstate.unpin();
         output.SetCardinality(0);
         output.Verify();
         return;
     }
 
+    // read array
     auto size = gstate.page->pagebuf_len / sizeof(double);
     double *pagevals = (double *)bf_util_get_pagebuf(gstate.page);
+    uint64_t read = 0;
 
     if (data.is_coo_array) {
         // TODO: Multi-tile array is not tested
-        uint64_t read = CooReader::PutData(data_p.bind_data, gstate, pagevals,
-                                           size / (data.dim_len + 1), output);
-
-        output.SetCardinality(read);
-        output.Verify();
+        read = CooReader::PutData(data_p.bind_data, gstate, pagevals,
+                                        size / (data.dim_len + 1), output);
     } else {
-        uint64_t read = ArrayReader::PutData(data_p.bind_data, gstate, pagevals,
-                                             size, output);
-
-        output.SetCardinality(read);
-        output.Verify();
+        read = ArrayReader::PutData(data_p.bind_data, gstate, pagevals,
+                                            size, output);
     }
 
-    // move the current_coords_in_tile to the next tile
-    if (gstate.cell_idx < size) return;
+    // set cardinality
+    output.SetCardinality(read);
+    output.Verify();
 
-    for (int64_t idx = data.dim_len - 1; idx >= 0; idx--) {
-        gstate.current_coords_in_tile[idx] += 1;
-        if (gstate.current_coords_in_tile[idx] < data.array_size_in_tile[idx]) {
+    // if we have read all cells, mark as finished
+    if (gstate.cell_idx == size) {
+        gstate.isFinished = true;
+    }
+}
+
+static void ReadArrayFunctionAll(ClientContext &context,
+                                        TableFunctionInput &data_p, DataChunk &output) {
+    auto &data = data_p.bind_data->Cast<ArrayReadData>();
+    auto &gstate = data_p.global_state->Cast<ArrayReadGlobalState>();
+
+    if (gstate.isFinished) {
+        gstate.unpin();
+        output.SetCardinality(0);
+        output.Verify();
+        return;
+    }
+
+    while (!gstate.isFinished) {
+        // read array
+        auto size = gstate.page->pagebuf_len / sizeof(double);
+        double *pagevals = (double *)bf_util_get_pagebuf(gstate.page);
+        uint64_t read = 0;
+
+        if (data.is_coo_array) {
+            // TODO: Multi-tile array is not tested
+            read = CooReader::PutData(data_p.bind_data, gstate, pagevals,
+                                            size / (data.dim_len + 1), output);
+        } else {
+            read = ArrayReader::PutData(data_p.bind_data, gstate, pagevals,
+                                                size, output);
+        }
+
+        // set cardinality
+         output.SetCardinality(output.size() + read);
+        output.Verify();
+
+        // if not finished but vector is full, escape the loop and read again in
+        // the next function call
+        if (gstate.cell_idx < size) {
             break;
         }
 
-        gstate.current_coords_in_tile[idx] = 0;
-        gstate.cell_idx = 0;
-        if (idx == 0) {
-            gstate.finished = true;
-            gstate.free();
-        }
+        // if finished, move to the next tile. If there is no tile, isFinish
+        // will be set to true
+        gstate.findNextTile();
     }
+}
+
+static void ReadArrayFunction(ClientContext &context,
+                              TableFunctionInput &data_p, DataChunk &output) {
+
+    auto &data = data_p.bind_data->Cast<ArrayReadData>();
+    // auto &gstate = data_p.global_state->Cast<ArrayReadGlobalState>();
+
+    if (data.requestedCoords.size() == 0) {
+        ReadArrayFunctionAll(context, data_p, output);
+    } else {
+        ReadArrayFunctionWithCoords(context, data_p, output);
+    }
+
 }
 
 unique_ptr<FunctionData> ReadArrayBind(ClientContext &context,
@@ -82,6 +127,14 @@ unique_ptr<FunctionData> ReadArrayBind(ClientContext &context,
                   << std::endl;
         if (it->first == "array_type" && it->second == "COO") {
             is_coo_array = true;
+        } else if (it->first == "coords") {
+            auto coords = ListValue::GetChildren(it->second);
+            assert(coords.size() == bind_data->dim_len);
+
+            for (int d = 0; d < (int) bind_data->dim_len; d++) {
+                bind_data->requestedCoords.push_back(
+                    coords[d].GetValue<int64_t>());
+            }
         }
     }
 
@@ -97,7 +150,7 @@ unique_ptr<FunctionData> ReadArrayBind(ClientContext &context,
         return_types.push_back(LogicalType::UINTEGER);
         return_types.push_back(LogicalType::DOUBLE);
 
-        names.emplace_back("idx");
+        names.emplace_back("x");
         names.emplace_back("val");
     } else if (bind_data->dim_len == 2) {
         return_types.push_back(LogicalType::UINTEGER);
@@ -178,11 +231,14 @@ unique_ptr<NodeStatistics> ReadArrayCardinality(ClientContext &context,
 TableFunction ArrayExtension::GetReadArrayFunction() {
     TableFunction function = TableFunction(
         "read_array",
-        {LogicalType::VARCHAR, LogicalType::LIST(LogicalType::INTEGER)},
+        {LogicalType::VARCHAR},
         ReadArrayFunction, ReadArrayBind, ReadArrayGlobalStateInit,
         ReadArrayLocalStateInit);
 
+    function.named_parameters["coords"] =
+        LogicalType::LIST(LogicalType::INTEGER);
     function.named_parameters["array_type"] = LogicalType::VARCHAR;
+
     // function.filter_pushdown = true;
     function.projection_pushdown = true;
     function.filter_prune = true;
