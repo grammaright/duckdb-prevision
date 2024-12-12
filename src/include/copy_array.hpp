@@ -25,50 +25,16 @@
 #include "buffer/bf.h"
 
 namespace duckdb {
+
 typedef enum ArrayCopyFunctionExecutionMode {
     COO_TO_ARRAY = 0,
-    VALUES_TO_TILE = 1
+    VALUES_TO_TILE = 1,
+    COOMA_TO_COO = 2,
+    COOMA_TO_DENSE = 3
 } ArrayCopyFunctionExecutionMode;
 
-class WriteArrayData : public FunctionData {
-   public:
-    WriteArrayData(string file_path);
-
-    unique_ptr<FunctionData> Copy() const override;
-    bool Equals(const FunctionData &other) const override;
-
-   public:
-    // ArrayCopyFunctionExecutionMode mode;
-    string array_name;
-
-    uint32_t dim_len;
-    vector<uint64_t> array_size_in_tile;
-    vector<uint64_t> tile_size;
-};
-
-class COOToArrayWriteArrayData : public WriteArrayData {
-   public:
-    COOToArrayWriteArrayData(string file_path);
-
-    // unique_ptr<FunctionData> Copy() const override;
-    // bool Equals(const FunctionData &other) const override;
-
-   public:
-    vector<uint64_t> tile_coords;
-};
-
-class DenseToTileWriteArrayData : public WriteArrayData {
-   public:
-    DenseToTileWriteArrayData(string file_path, vector<uint64_t> tile_coords);
-
-    // unique_ptr<FunctionData> Copy() const override;
-    // bool Equals(const FunctionData &other) const override;
-
-   public:
-    vector<uint64_t> tile_coords;
-};
-
 class CopyArrayWriter;
+
 struct GlobalWriteArrayData : public GlobalFunctionData {
    public:
     GlobalWriteArrayData(ClientContext &context, FunctionData &bind_data,
@@ -99,41 +65,16 @@ struct GlobalWriteArrayData : public GlobalFunctionData {
     uint32_t dim_len;
     bool is_pinned;
 
-   private:
+   protected:
     array_key key;
     char *arrname_char;
+
+    uint64_t rowIdx;        // only for CoomaToCooCopyArrayWriter
 
     // to check the tile has been pinned to set nullbits
     set<vector<uint64_t>> pinned_tiles;
 };
 
 struct LocalWriteArrayData : public LocalFunctionData {};
-
-class CopyArrayWriter {
-   public:
-    virtual void WriteArrayData(ExecutionContext &context,
-                                FunctionData &bind_data,
-                                GlobalFunctionData &gstate,
-                                LocalFunctionData &lstate,
-                                DataChunk &input) = 0;
-};
-
-class COOToArrayCopyArrayWriter : public CopyArrayWriter {
-   public:
-    COOToArrayCopyArrayWriter();
-    void WriteArrayData(ExecutionContext &context, FunctionData &bind_data,
-                        GlobalFunctionData &gstate, LocalFunctionData &lstate,
-                        DataChunk &input) override;
-};
-
-class DenseToTileCopyArrayWriter : public CopyArrayWriter {
-   public:
-    DenseToTileCopyArrayWriter(GlobalFunctionData &gstate,
-                               DenseToTileWriteArrayData &array_data);
-    void WriteArrayData(ExecutionContext &context, FunctionData &bind_data,
-                        GlobalFunctionData &gstate, LocalFunctionData &lstate,
-                        DataChunk &input) override;
-    uint64_t cur_idx;
-};
 
 }  // namespace duckdb

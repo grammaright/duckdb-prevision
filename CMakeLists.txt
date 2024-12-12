@@ -20,7 +20,16 @@ include_directories(src/include)
 include_directories("$ENV{PREVISION_PATH}/src/include")
 
 set(EXTENSION_SOURCES src/array_extension.cpp
-                      src/read_array.cpp src/copy_array.cpp src/array_reader.cpp src/coo_reader.cpp src/create_array.cpp)
+                      src/read_array.cpp 
+                      src/copy_array.cpp 
+                      src/array_reader/array_reader.cpp 
+                      src/array_reader/coo_reader.cpp 
+                      src/array_writer/base_writer.cpp
+                      src/array_writer/coo_to_dense_writer.cpp
+                      src/array_writer/dense_to_dense_writer.cpp
+                      src/array_writer/cooma_to_dense_writer.cpp
+                      src/array_writer/cooma_to_coo_writer.cpp
+                      src/create_array.cpp)
 
 build_static_extension(${TARGET_NAME} ${EXTENSION_SOURCES})
 build_loadable_extension(${TARGET_NAME} " " ${EXTENSION_SOURCES})

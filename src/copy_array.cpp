@@ -1,45 +1,15 @@
-#include "copy_array.hpp"
-
 #include "array_extension.hpp"
+#include "copy_array.hpp"
+#include "array_writer.hpp"
 
 #include "buffer/bf.h"
 
 namespace duckdb {
-COOToArrayWriteArrayData::COOToArrayWriteArrayData(string file_path)
-    : WriteArrayData(file_path) {}
-
-DenseToTileWriteArrayData::DenseToTileWriteArrayData(
-    string file_path, vector<uint64_t> _tile_coords)
-    : WriteArrayData(file_path), tile_coords(_tile_coords) {}
-
-WriteArrayData::WriteArrayData(string file_path) {
-    array_name = file_path.substr(0, file_path.find_last_of("."));
-
-    uint64_t **_dim_domains;
-    uint64_t *_tile_size;
-    uint64_t *_array_size_in_tile;
-    storage_util_get_dim_domains(array_name.c_str(), &_dim_domains, &dim_len);
-    storage_util_get_tile_extents(array_name.c_str(), &_tile_size, &dim_len);
-    storage_util_get_dcoord_lens(_dim_domains, _tile_size, dim_len,
-                                 &_array_size_in_tile);
-
-    array_size_in_tile =
-        vector<uint64_t>(_array_size_in_tile, _array_size_in_tile + dim_len);
-    tile_size = vector<uint64_t>(_tile_size, _tile_size + dim_len);
-
-    storage_util_free_dim_domains(&_dim_domains, dim_len);
-    storage_util_free_tile_extents(&_tile_size, dim_len);
-    storage_util_free_dcoord_lens(&_array_size_in_tile);
-}
-
-unique_ptr<FunctionData> WriteArrayData::Copy() const { return nullptr; }
-
-bool WriteArrayData::Equals(const FunctionData &other_p) const { return false; }
 
 GlobalWriteArrayData::GlobalWriteArrayData(ClientContext &context,
                                            FunctionData &bind_data,
                                            const string &file_path) {
-    auto &data = bind_data.Cast<WriteArrayData>();
+    auto &data = bind_data.Cast<CopyArrayData>();
 
     auto arrname = data.array_name.c_str();
     arrname_char = new char[1024];
@@ -49,14 +19,7 @@ GlobalWriteArrayData::GlobalWriteArrayData(ClientContext &context,
     tile_coords = new uint64_t[dim_len];
 
     is_pinned = false;
-
-    // if data is instance of COOToArrayWriteArrayData
-    if (dynamic_cast<DenseToTileWriteArrayData *>(&data)) {
-        auto &array_data = data.Cast<DenseToTileWriteArrayData>();
-        writer = make_uniq<DenseToTileCopyArrayWriter>(*this, array_data);
-    } else if (dynamic_cast<COOToArrayWriteArrayData *>(&data)) {
-        writer = make_uniq<COOToArrayCopyArrayWriter>();
-    }
+    page = NULL;
 
     // disable preemptive eviction for future array access (e.g., another table
     // or array queries)
@@ -64,17 +27,6 @@ GlobalWriteArrayData::GlobalWriteArrayData(ClientContext &context,
 
     ArrayExtension::ResetPVBufferStats();
 }
-
-DenseToTileCopyArrayWriter::DenseToTileCopyArrayWriter(
-    GlobalFunctionData &gstate, DenseToTileWriteArrayData &array_data) {
-    auto &array_gstate = gstate.Cast<GlobalWriteArrayData>();
-
-    array_gstate.pin(array_data.tile_coords);
-
-    cur_idx = 0;
-}
-
-COOToArrayCopyArrayWriter::COOToArrayCopyArrayWriter() {}
 
 void GlobalWriteArrayData::pin(vector<uint64_t> _tile_coords) {
     assert(!is_pinned);
@@ -84,8 +36,19 @@ void GlobalWriteArrayData::pin(vector<uint64_t> _tile_coords) {
         tile_coords[i] = _tile_coords[i];
     }
 
-    // TODO: Consider sparse tile in the future
-    key = {arrname_char, tile_coords, dim_len, BF_EMPTYTILE_DENSE};
+    // determine dense or sparse
+    emptytile_template_type_t emptytileTemplate = BF_EMPTYTILE_NONE;
+    tilestore_format_t format;
+    storage_util_get_array_type(arrname_char, &format);
+    if (format == TILESTORE_DENSE) {
+        emptytileTemplate = BF_EMPTYTILE_DENSE;
+    } else if (format == TILESTORE_SPARSE_CSR) {
+        emptytileTemplate = BF_EMPTYTILE_SPARSE_CSR;
+    } else if (format == TILESTORE_SPARSE_COO) {
+        emptytileTemplate = BF_EMPTYTILE_SPARSE_COO;
+    }
+
+    key = {arrname_char, tile_coords, dim_len, emptytileTemplate};
 
     int res = BF_GetBuf(key, &page);
     assert(res == BFE_OK);
@@ -119,10 +82,6 @@ void GlobalWriteArrayData::unpin() {
     page = NULL;
     is_pinned = false;
 }
-
-// vector<uint32_t> GlobalWriteArrayData::GetTileCoords() {
-//     return vector<uint32_t>(tile_coords, tile_coords + dim_len);
-// }
 
 static unique_ptr<FunctionData> WriteArrayBind(
     ClientContext &context, CopyFunctionBindInput &input,
@@ -163,6 +122,10 @@ static unique_ptr<FunctionData> WriteArrayBind(
                 mode = COO_TO_ARRAY;
             } else if (mode_code == 1) {
                 mode = VALUES_TO_TILE;
+            } else if (mode_code == 2) {
+                mode = COOMA_TO_COO;
+            } else if (mode_code == 3) {
+                mode = COOMA_TO_DENSE;
             } else {
                 throw NotImplementedException("Unknown mode for WriteArray: %d",
                                               mode_code);
@@ -173,13 +136,11 @@ static unique_ptr<FunctionData> WriteArrayBind(
         }
     }
 
-    if (mode == COO_TO_ARRAY) {
-        auto file_path = input.info.file_path;
-        auto bind_data = make_uniq<COOToArrayWriteArrayData>(file_path);
+    auto file_path = input.info.file_path;
+    if (mode != VALUES_TO_TILE) {
+        auto bind_data = make_uniq<CopyArrayData>(file_path, mode);
         return std::move(bind_data);
     } else {
-        auto file_path = input.info.file_path;
-
         vector<uint64_t> tile_coords;
         if (dim_len == 1) {
             tile_coords.push_back(x);
@@ -193,7 +154,7 @@ static unique_ptr<FunctionData> WriteArrayBind(
         }
 
         auto bind_data =
-            make_uniq<DenseToTileWriteArrayData>(file_path, tile_coords);
+            make_uniq<DenseToTileCopyArrayData>(file_path, mode, tile_coords);
         return std::move(bind_data);
     }
 }
@@ -205,95 +166,22 @@ static unique_ptr<LocalFunctionData> WriteArrayInitializeLocal(
 
 static unique_ptr<GlobalFunctionData> WriteArrayInitializeGlobal(
     ClientContext &context, FunctionData &bind_data, const string &file_path) {
-    // std::cerr << "WriteArrayInitializeGlobal() called" << std::endl;
-    return std::move(
-        make_uniq<GlobalWriteArrayData>(context, bind_data, file_path));
-}
-
-void COOToArrayCopyArrayWriter::WriteArrayData(ExecutionContext &context,
-                                               FunctionData &bind_data,
-                                               GlobalFunctionData &gstate,
-                                               LocalFunctionData &lstate,
-                                               DataChunk &input) {
-    // NOTE: I assume that only one thread runs
-    auto &array_gstate = gstate.Cast<GlobalWriteArrayData>();
-    auto &array_data = bind_data.Cast<COOToArrayWriteArrayData>();
-
-    // We don't know what vector type DuckDB will give
-    // So we need to convert it to unified vector format
-    // vector type ref: https://youtu.be/bZOvAKGkzpQ?si=ShnWtUDKNIm7ymo8&t=1265
-
-    // FIXME: Maybe performance panalty.
-    // exploit the vector type
-    input.Flatten();
-
-    double *val = FlatVector::GetData<double>(input.data[array_data.dim_len]);
-
-    uint64_t *tcoords = new uint64_t[array_data.dim_len];
-    for (idx_t i = 0; i < input.size(); i++) {
-        uint64_t onedcoord = 0;
-        int64_t base = 1;
-        bool out = false;
-        for (int64_t d = array_data.dim_len - 1; d >= 0; d--) {
-            uint32_t *coord_vec = FlatVector::GetData<uint32_t>(input.data[d]);
-            uint64_t lcoord = (uint64_t)coord_vec[i] % array_data.tile_size[d];
-            tcoords[d] = (uint64_t)coord_vec[i] / array_data.tile_size[d];
-
-            // std::cerr << "d[" << d << "]=" << lcoord << "(" << coord_vec[i] << "),";
-
-            onedcoord += lcoord * base;
-            base *= array_data.tile_size[d];
-
-            if (tcoords[d] != array_gstate.tile_coords[d]) {
-                out = true;
-            }
-        }
-        // std::cerr << " onedcoord=" << onedcoord << ", val=" << val[i] << std::endl;
-
-        if (out) {
-            // std::cout << ", unpinning";
-            array_gstate.unpin();
-        }
-
-        if (!array_gstate.is_pinned) {
-            // std::cout << ", pinning";
-            array_gstate.pin(
-                vector<uint64_t>(tcoords, tcoords + array_data.dim_len));
-        }
-
-        array_gstate.buf[onedcoord] = val[i];
-        // reset nullbit if nullable array
-        if (array_gstate.page->type == DENSE_FIXED_NULLABLE ||
-            array_gstate.page->type == SPARSE_FIXED_NULLABLE) {
-            bf_util_reset_cell_null(array_gstate.page, onedcoord);
-        }
-
-        // std::cout << ", buf[" << idx << "] = " << val[i] << std::endl;
+    auto &array_bind = bind_data.Cast<CopyArrayData>();
+    if (array_bind.mode == VALUES_TO_TILE) {
+        return std::move(make_uniq<GlobalDenseToTileWriteArrayData>(
+            context, bind_data, file_path));
+    } else if (array_bind.mode == COO_TO_ARRAY) {
+        return std::move(make_uniq<GlobalCOOToArrayWriteArrayData>(
+            context, bind_data, file_path));
+    } else if (array_bind.mode == COOMA_TO_COO) {
+        return std::move(make_uniq<GlobalCoomaToCooWriteArrayData>(
+            context, bind_data, file_path));
+    } else if (array_bind.mode == COOMA_TO_DENSE) {
+        return std::move(make_uniq<GlobalCoomaToDenseWriteArrayData>(
+            context, bind_data, file_path));
     }
 
-    delete tcoords;
-}
-
-void DenseToTileCopyArrayWriter::WriteArrayData(ExecutionContext &context,
-                                                FunctionData &bind_data,
-                                                GlobalFunctionData &gstate,
-                                                LocalFunctionData &lstate,
-                                                DataChunk &input) {
-    // NOTE: I assume that only one thread runs
-    auto &array_gstate = gstate.Cast<GlobalWriteArrayData>();
-
-    // We don't know what vector type DuckDB will give
-    // So we need to convert it to unified vector format
-    // vector type ref: https://youtu.be/bZOvAKGkzpQ?si=ShnWtUDKNIm7ymo8&t=1265
-    input.data[0].Flatten(input.size());  // FIXME: Maybe performance panalty.
-                                          // exploit the vector type
-    auto vector = FlatVector::GetData<double>(input.data[0]);
-
-    D_ASSERT(cur_idx + input.size() <= array_gstate.buf_size);
-
-    for (idx_t i = 0; i < input.size(); i++) {
-        array_gstate.buf[cur_idx++] = vector[i];
-    }
+    return nullptr;
 }
 
 static void WriteArraySink(ExecutionContext &context, FunctionData &bind_data,

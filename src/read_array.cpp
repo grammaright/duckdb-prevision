@@ -31,14 +31,21 @@ static void ReadArrayFunctionWithCoords(ClientContext &context,
     }
 
     // read array
-    auto size = gstate.page->pagebuf_len / sizeof(double);
-    double *pagevals = (double *)bf_util_get_pagebuf(gstate.page);
+    auto size = gstate.page->unfilled_idx;
+    char *pagevals = (char *)bf_util_get_pagebuf(gstate.page);
     uint64_t read = 0;
 
-    if (data.is_coo_array) {
+    // coords
+    vector<uint64_t *> coords;
+    for (int d = 0; d < (int)data.dim_len; d++) {
+        coords.push_back(
+            (uint64_t *)bf_util_pagebuf_get_coords(gstate.page, d));
+    }
+
+    if (data.format == TILESTORE_SPARSE_COO) {
         // TODO: Multi-tile array is not tested
-        read = CooReader::PutData(data_p.bind_data, gstate, pagevals,
-                                        size / (data.dim_len + 1), output);
+        read = CooReader::PutData(data_p.bind_data, gstate, pagevals, coords,
+                                  size, output);
     } else {
         read = ArrayReader::PutData(data_p.bind_data, gstate, pagevals,
                                             size, output);
@@ -68,21 +75,25 @@ static void ReadArrayFunctionAll(ClientContext &context,
 
     while (!gstate.isFinished) {
         // read array
-        auto size = gstate.page->pagebuf_len / sizeof(double);
-        double *pagevals = (double *)bf_util_get_pagebuf(gstate.page);
+        auto size = gstate.page->unfilled_idx;
+        char *pagevals = (char *)bf_util_get_pagebuf(gstate.page);
         uint64_t read = 0;
 
-        if (data.is_coo_array) {
-            // TODO: Multi-tile array is not tested
+        if (data.format == TILESTORE_SPARSE_COO) {
+            vector<uint64_t*> coords;
+            for (int d = 0; d < (int)data.dim_len; d++) {
+                coords.push_back(
+                    (uint64_t *)bf_util_pagebuf_get_coords(gstate.page, d));
+            }
             read = CooReader::PutData(data_p.bind_data, gstate, pagevals,
-                                            size / (data.dim_len + 1), output);
+                                      coords, size, output);
         } else {
             read = ArrayReader::PutData(data_p.bind_data, gstate, pagevals,
                                                 size, output);
         }
 
         // set cardinality
-         output.SetCardinality(output.size() + read);
+        output.SetCardinality(output.size() + read);
         output.Verify();
 
         // if not finished but vector is full, escape the loop and read again in
@@ -95,6 +106,8 @@ static void ReadArrayFunctionAll(ClientContext &context,
         // will be set to true
         gstate.findNextTile();
     }
+
+    // std::cerr << "done function call" << std::endl;
 }
 
 static void ReadArrayFunction(ClientContext &context,
@@ -108,8 +121,20 @@ static void ReadArrayFunction(ClientContext &context,
     } else {
         ReadArrayFunctionWithCoords(context, data_p, output);
     }
-
 }
+
+// static LogicalType GetStringToType(string attr_type) {
+//     if (attr_type == "INTEGER") {
+//         return LogicalType::INTEGER;
+//     } else if (attr_type == "FLOAT") {
+//         return LogicalType::FLOAT;
+//     } else if (attr_type == "DOUBLE") {
+//         return LogicalType::DOUBLE;
+//     } else {
+//         throw NotImplementedException("Unsupported attribute type: " + attr_type);
+//     }
+//     return LogicalType::INVALID;
+// }
 
 unique_ptr<FunctionData> ReadArrayBind(ClientContext &context,
                                        TableFunctionBindInput &input,
@@ -120,14 +145,11 @@ unique_ptr<FunctionData> ReadArrayBind(ClientContext &context,
     unique_ptr<ArrayReadData> bind_data = make_uniq<ArrayReadData>(arrayname);
 
     // array_type
-    bool is_coo_array = false;
     for (auto it = input.named_parameters.begin();
          it != input.named_parameters.end(); it++) {
         std::cerr << "Named parameter: " << it->first << " = " << it->second
                   << std::endl;
-        if (it->first == "array_type" && it->second == "COO") {
-            is_coo_array = true;
-        } else if (it->first == "coords") {
+        if (it->first == "coords") {
             auto coords = ListValue::GetChildren(it->second);
             assert(coords.size() == bind_data->dim_len);
 
@@ -138,41 +160,40 @@ unique_ptr<FunctionData> ReadArrayBind(ClientContext &context,
         }
     }
 
-    bind_data->is_coo_array = is_coo_array;
+    // TODO: CSR array is not supported yet
+    assert(bind_data->format != TILESTORE_SPARSE_CSR);
 
-    // TODO: Currently, only 2D array is supported for COO array
-    if (is_coo_array) {
-        assert(bind_data->dim_len == 2);
-    }
+    // TODO: multi-attributes are not supported yet for dense array
+    bool isMultiAttrs = bind_data->attrTypes.size() > 1;
+    if (bind_data->format == TILESTORE_DENSE) assert(!isMultiAttrs);
 
-    // regular array (dense & sparse (in the future))
+    // dimensions first
     if (bind_data->dim_len == 1) {
         return_types.push_back(LogicalType::UINTEGER);
-        return_types.push_back(LogicalType::DOUBLE);
-
         names.emplace_back("x");
-        names.emplace_back("val");
     } else if (bind_data->dim_len == 2) {
         return_types.push_back(LogicalType::UINTEGER);
         return_types.push_back(LogicalType::UINTEGER);
-        return_types.push_back(LogicalType::DOUBLE);
 
         names.emplace_back("x");
         names.emplace_back("y");
-        names.emplace_back("val");
     } else if (bind_data->dim_len == 3) {
         return_types.push_back(LogicalType::UINTEGER);
         return_types.push_back(LogicalType::UINTEGER);
         return_types.push_back(LogicalType::UINTEGER);
-        return_types.push_back(LogicalType::DOUBLE);
 
         names.emplace_back("x");
         names.emplace_back("y");
         names.emplace_back("z");
-        names.emplace_back("val");
     } else {
         throw NotImplementedException(
             "Only 1D, 2D, and 3D arrays are supported");
+    }
+
+    // attributes
+    for (uint32_t i = 0; i < bind_data->attrTypes.size(); i++) {
+        return_types.push_back(bind_data->attrTypes[i]);
+        names.emplace_back("a" + std::to_string(i));
     }
 
     return std::move(bind_data);
@@ -238,6 +259,8 @@ TableFunction ArrayExtension::GetReadArrayFunction() {
     function.named_parameters["coords"] =
         LogicalType::LIST(LogicalType::INTEGER);
     function.named_parameters["array_type"] = LogicalType::VARCHAR;
+    function.named_parameters["attr_types"] =
+        LogicalType::LIST(LogicalType::VARCHAR);
 
     // function.filter_pushdown = true;
     function.projection_pushdown = true;

@@ -4,7 +4,7 @@
 namespace duckdb {
 
 uint64_t ArrayReader::_Put3DNullableData(optional_ptr<const FunctionData> bind_data,
-                                 ArrayReadGlobalState &gstate, double *pagevals,
+                                 ArrayReadGlobalState &gstate, char *pagevals,
                                  uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
     uint64_t max_processable = (uint64_t)STANDARD_VECTOR_SIZE;
@@ -82,8 +82,8 @@ uint64_t ArrayReader::_Put3DNullableData(optional_ptr<const FunctionData> bind_d
                     buf_idx++;
                     continue;
                 }
-                    
-                vec[idx++] = pagevals[buf_idx++];
+
+                vec[idx++] = ((double *)pagevals)[buf_idx++];
             }
 
             num_processed = idx - current_filled;
@@ -97,7 +97,7 @@ uint64_t ArrayReader::_Put3DNullableData(optional_ptr<const FunctionData> bind_d
 
 uint64_t ArrayReader::_Put3DNullableDataNoPrune(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+    char *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
     uint64_t max_processable = (uint64_t)STANDARD_VECTOR_SIZE;
@@ -121,7 +121,7 @@ uint64_t ArrayReader::_Put3DNullableDataNoPrune(
             buf_idx, (uint64_t *)data.tile_size.data(), data.dim_len,
             &coords);
 
-        double val = pagevals[buf_idx];
+        double val = ((double *)pagevals)[buf_idx];
         for (uint32_t i = 0; i < gstate.column_ids.size(); i++) {
             if (gstate.column_ids[i] == 0)
                 FlatVector::GetData<uint32_t>(output.data[i])[idx] =
@@ -146,7 +146,7 @@ uint64_t ArrayReader::_Put3DNullableDataNoPrune(
 
 uint64_t ArrayReader::_Put3DNullableDataNoPruneAndProjection(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+    char *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
     uint64_t max_processable = (uint64_t)STANDARD_VECTOR_SIZE;
@@ -175,7 +175,7 @@ uint64_t ArrayReader::_Put3DNullableDataNoPruneAndProjection(
         bf_util_calculate_nd_from_1d_row_major(
             buf_idx, (uint64_t *)data.tile_size.data(), data.dim_len,
             &coords);
-        double val = pagevals[buf_idx];
+        double val = ((double *)pagevals)[buf_idx];
         xs[idx] = offsets[0] + coords[0];
         ys[idx] = offsets[1] + coords[1];
         zs[idx] = offsets[2] + coords[2];
@@ -190,7 +190,7 @@ uint64_t ArrayReader::_Put3DNullableDataNoPruneAndProjection(
 }
 
 uint64_t ArrayReader::_Put3DData(optional_ptr<const FunctionData> bind_data,
-                                 ArrayReadGlobalState &gstate, double *pagevals,
+                                 ArrayReadGlobalState &gstate, char *pagevals,
                                  uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
@@ -201,10 +201,10 @@ uint64_t ArrayReader::_Put3DData(optional_ptr<const FunctionData> bind_data,
 
     for (uint32_t i = 0; i < gstate.projection_ids.size(); i++) {
         auto dest = gstate.column_ids[gstate.projection_ids[i]];
-        uint32_t offset =
-            gstate.currentCoordsInTile[dest] * data.tile_size[dest];
         if (dest == 0) {
             auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
+            uint32_t offset =
+                gstate.currentCoordsInTile[dest] * data.tile_size[dest];
             for (uint64_t idx = 0; idx < local_remains; idx++) {
                 uint32_t vec_idx = current_filled + idx;
                 uint32_t buf_idx = gstate.cell_idx + idx;
@@ -214,6 +214,8 @@ uint64_t ArrayReader::_Put3DData(optional_ptr<const FunctionData> bind_data,
             }
         } else if (dest == 1) {
             auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
+            uint32_t offset =
+                gstate.currentCoordsInTile[dest] * data.tile_size[dest];
             for (uint64_t idx = 0; idx < local_remains; idx++) {
                 uint32_t vec_idx = current_filled + idx;
                 uint32_t buf_idx = gstate.cell_idx + idx;
@@ -223,6 +225,8 @@ uint64_t ArrayReader::_Put3DData(optional_ptr<const FunctionData> bind_data,
             }
         } else if (dest == 2) {
             auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
+            uint32_t offset =
+                gstate.currentCoordsInTile[dest] * data.tile_size[dest];
             for (uint64_t idx = 0; idx < local_remains; idx++) {
                 uint32_t vec_idx = current_filled + idx;
                 uint32_t buf_idx = gstate.cell_idx + idx;
@@ -231,7 +235,7 @@ uint64_t ArrayReader::_Put3DData(optional_ptr<const FunctionData> bind_data,
             }
         } else if (dest == 3) {
             auto vec = FlatVector::GetData<double>(output.data[i]);
-            memcpy(vec + current_filled, pagevals + gstate.cell_idx,
+            memcpy(vec + current_filled, ((double *)pagevals) + gstate.cell_idx,
                    sizeof(double) * local_remains);
         }
     }
@@ -242,7 +246,7 @@ uint64_t ArrayReader::_Put3DData(optional_ptr<const FunctionData> bind_data,
 
 uint64_t ArrayReader::_Put3DDataNoPrune(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+    char *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
     uint64_t current_filled = output.size();
@@ -260,7 +264,7 @@ uint64_t ArrayReader::_Put3DDataNoPrune(
         uint64_t buf_idx = gstate.cell_idx + idx;
         bf_util_calculate_nd_from_1d_row_major(
             buf_idx, (uint64_t *)data.tile_size.data(), data.dim_len, &coords);
-        double val = pagevals[buf_idx];
+        double val = ((double *)pagevals)[buf_idx];
 
         auto vec_idx = current_filled + idx;
         for (uint32_t i = 0; i < gstate.column_ids.size(); i++) {
@@ -284,7 +288,7 @@ uint64_t ArrayReader::_Put3DDataNoPrune(
 
 uint64_t ArrayReader::_Put3DDataNoPruneAndProjection(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+    char *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
     uint64_t current_filled = output.size();
@@ -309,7 +313,7 @@ uint64_t ArrayReader::_Put3DDataNoPruneAndProjection(
         bf_util_calculate_nd_from_1d_row_major(
             buf_idx, (uint64_t *)data.tile_size.data(), data.dim_len, &coords);
 
-        double val = pagevals[buf_idx];
+        double val = ((double *)pagevals)[buf_idx];
         auto vec_idx = current_filled + idx;
 
         xs[vec_idx] = offsets[0] + coords[0];
@@ -327,7 +331,7 @@ uint64_t ArrayReader::_Put3DDataNoPruneAndProjection(
 }
 
 uint64_t ArrayReader::_Put2DData(optional_ptr<const FunctionData> bind_data,
-                                 ArrayReadGlobalState &gstate, double *pagevals,
+                                 ArrayReadGlobalState &gstate, char *pagevals,
                                  uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
@@ -339,10 +343,10 @@ uint64_t ArrayReader::_Put2DData(optional_ptr<const FunctionData> bind_data,
     // for dest == 1 and 2
     for (uint32_t i = 0; i < gstate.projection_ids.size(); i++) {
         auto dest = gstate.column_ids[gstate.projection_ids[i]];
-        uint32_t offset =
-            gstate.currentCoordsInTile[dest] * data.tile_size[dest];
         if (dest == 0) {
             auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
+            uint32_t offset =
+                gstate.currentCoordsInTile[dest] * data.tile_size[dest];
             for (uint64_t idx = 0; idx < local_remains; idx++) {
                 uint32_t vec_idx = current_filled + idx;
                 uint32_t buf_idx = gstate.cell_idx + idx;
@@ -351,6 +355,8 @@ uint64_t ArrayReader::_Put2DData(optional_ptr<const FunctionData> bind_data,
             }
         } else if (dest == 1) {
             auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
+            uint32_t offset =
+                gstate.currentCoordsInTile[dest] * data.tile_size[dest];
             for (uint64_t idx = 0; idx < local_remains; idx++) {
                 uint32_t vec_idx = current_filled + idx;
                 uint32_t buf_idx = gstate.cell_idx + idx;
@@ -359,7 +365,7 @@ uint64_t ArrayReader::_Put2DData(optional_ptr<const FunctionData> bind_data,
             }
         } else if (dest == 2) {
             auto vec = FlatVector::GetData<double>(output.data[i]);
-            memcpy(vec + current_filled, pagevals + gstate.cell_idx,
+            memcpy(vec + current_filled, ((double *)pagevals) + gstate.cell_idx,
                    sizeof(double) * local_remains);
         }
     }
@@ -370,7 +376,7 @@ uint64_t ArrayReader::_Put2DData(optional_ptr<const FunctionData> bind_data,
 
 uint64_t ArrayReader::_Put2DDataNoPrune(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+    char *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
     uint64_t current_filled = output.size();
@@ -389,7 +395,7 @@ uint64_t ArrayReader::_Put2DDataNoPrune(
         bf_util_calculate_nd_from_1d_row_major(
             buf_idx, (uint64_t *)data.tile_size.data(), 2, &coords);
 
-        double val = pagevals[buf_idx];
+        double val = ((double *)pagevals)[buf_idx];
 
         uint32_t vec_idx = current_filled + idx;
         for (uint32_t i = 0; i < gstate.column_ids.size(); i++) {
@@ -414,7 +420,7 @@ uint64_t ArrayReader::_Put2DDataNoPrune(
 
 uint64_t ArrayReader::_Put2DDataNoPruneAndProjection(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+    char *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
     uint64_t current_filled = output.size();
@@ -438,7 +444,7 @@ uint64_t ArrayReader::_Put2DDataNoPruneAndProjection(
         bf_util_calculate_nd_from_1d_row_major(
             buf_idx, (uint64_t *)data.tile_size.data(), 2, &coords);
 
-        double val = pagevals[buf_idx];
+        double val = ((double *)pagevals)[buf_idx];
         uint32_t vec_idx = current_filled + idx;
 
         xs[vec_idx] = offsets[0] + coords[0];
@@ -455,7 +461,7 @@ uint64_t ArrayReader::_Put2DDataNoPruneAndProjection(
 }
 
 uint64_t ArrayReader::_Put2DNullableData(optional_ptr<const FunctionData> bind_data,
-                                 ArrayReadGlobalState &gstate, double *pagevals,
+                                 ArrayReadGlobalState &gstate, char *pagevals,
                                  uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
     uint64_t current_filled = output.size();
@@ -518,11 +524,11 @@ uint64_t ArrayReader::_Put2DNullableData(optional_ptr<const FunctionData> bind_d
                     continue;
                 }
                     
-                vec[idx++] = pagevals[buf_idx++];
+                vec[idx++] = ((double *)pagevals)[buf_idx++];
             }
 
             num_processed = idx - current_filled;
-            new_cell_idx = offsets[dest] + buf_idx;
+            new_cell_idx = buf_idx;
         }
     }
 
@@ -532,7 +538,7 @@ uint64_t ArrayReader::_Put2DNullableData(optional_ptr<const FunctionData> bind_d
 
 uint64_t ArrayReader::_Put2DNullableDataNoPrune(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+    char *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
     uint64_t current_filled = output.size();
@@ -556,7 +562,7 @@ uint64_t ArrayReader::_Put2DNullableDataNoPrune(
             buf_idx, (uint64_t *)data.tile_size.data(), data.dim_len,
             &coords);
 
-        double val = pagevals[buf_idx];
+        double val = ((double *)pagevals)[buf_idx];
         for (uint32_t i = 0; i < gstate.column_ids.size(); i++) {
             if (gstate.column_ids[i] == 0)
                 FlatVector::GetData<uint32_t>(output.data[i])[idx] =
@@ -578,7 +584,7 @@ uint64_t ArrayReader::_Put2DNullableDataNoPrune(
 
 uint64_t ArrayReader::_Put2DNullableDataNoPruneAndProjection(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+    char *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
     uint64_t current_filled = output.size();
@@ -606,7 +612,7 @@ uint64_t ArrayReader::_Put2DNullableDataNoPruneAndProjection(
         bf_util_calculate_nd_from_1d_row_major(
             buf_idx, (uint64_t *)data.tile_size.data(), data.dim_len,
             &coords);
-        double val = pagevals[buf_idx];
+        double val = ((double *)pagevals)[buf_idx];
         xs[idx] = offsets[0] + coords[0];
         ys[idx] = offsets[1] + coords[1];
         vals[idx] = val;
@@ -620,7 +626,7 @@ uint64_t ArrayReader::_Put2DNullableDataNoPruneAndProjection(
 }
 
 uint64_t ArrayReader::_Put1DData(optional_ptr<const FunctionData> bind_data,
-                                 ArrayReadGlobalState &gstate, double *pagevals,
+                                 ArrayReadGlobalState &gstate, char *pagevals,
                                  uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
 
@@ -633,7 +639,7 @@ uint64_t ArrayReader::_Put1DData(optional_ptr<const FunctionData> bind_data,
 
     for (uint64_t idx = 0; idx < local_remains; idx++) {
         auto buf_idx = gstate.cell_idx + idx;
-        double val = pagevals[buf_idx];
+        double val = ((double *)pagevals)[buf_idx];
 
         uint64_t vec_idx = current_filled + idx;
         for (uint32_t i = 0; i < gstate.projection_ids.size(); i++) {
@@ -655,7 +661,7 @@ uint64_t ArrayReader::_Put1DData(optional_ptr<const FunctionData> bind_data,
 
 uint64_t ArrayReader::_Put1DDataNoPrune(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+    char *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
     uint64_t current_filled = output.size();
     uint32_t offset = gstate.currentCoordsInTile[0] * data.tile_size[0];
@@ -666,7 +672,7 @@ uint64_t ArrayReader::_Put1DDataNoPrune(
 
     for (uint64_t idx = 0; idx < local_remains; idx++) {
         auto buf_idx = gstate.cell_idx + idx;
-        double val = pagevals[buf_idx];
+        double val = ((double *)pagevals)[buf_idx];
 
         uint64_t vec_idx = current_filled + idx;
         for (uint32_t i = 0; i < gstate.column_ids.size(); i++) {
@@ -688,7 +694,7 @@ uint64_t ArrayReader::_Put1DDataNoPrune(
 
 uint64_t ArrayReader::_Put1DDataNoPruneAndProjection(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
-    double *pagevals, uint64_t size, DataChunk &output) {
+    char *pagevals, uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
     uint32_t offset = gstate.currentCoordsInTile[0] * data.tile_size[0];
 
@@ -707,7 +713,7 @@ uint64_t ArrayReader::_Put1DDataNoPruneAndProjection(
         bf_util_calculate_nd_from_1d_row_major(
             buf_idx, (uint64_t *)data.tile_size.data(), 2, &coords);
 
-        double val = pagevals[buf_idx];
+        double val = ((double *)pagevals)[buf_idx];
         uint64_t vec_idx = current_filled + idx;
 
         xs[vec_idx] = offset + buf_idx;
@@ -724,7 +730,7 @@ uint64_t ArrayReader::_Put1DDataNoPruneAndProjection(
 }
 
 uint64_t ArrayReader::PutData(optional_ptr<const FunctionData> bind_data,
-                              ArrayReadGlobalState &gstate, double *pagevals,
+                              ArrayReadGlobalState &gstate, char *pagevals,
                               uint64_t size, DataChunk &output) {
     auto &data = bind_data->Cast<ArrayReadData>();
     bool nullable = gstate.page->type == DENSE_FIXED_NULLABLE ||

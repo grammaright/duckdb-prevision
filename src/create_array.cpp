@@ -70,7 +70,7 @@ void CreateArrayScalarFunction(DataChunk &args, ExpressionState &state,
 
     // create array
     if (tilestore_create_array(
-            arrname.c_str(), arr, tile, dim_len, attr_type, format,
+            arrname.c_str(), arr, tile, dim_len, 1, &attr_type, format,
             vec_is_nullable[0] ? TILESTORE_NULLABLE : TILESTORE_NOT_NULLABLE) !=
         TILESTORE_OK) {
         throw InternalException("Failed to create array");

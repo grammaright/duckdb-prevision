@@ -29,66 +29,66 @@ namespace duckdb {
 class ArrayReader {
    public:
     static uint64_t PutData(optional_ptr<const FunctionData> bind_data,
-                            ArrayReadGlobalState &gstate, double *pagevals,
+                            ArrayReadGlobalState &gstate, char *pagevals,
                             uint64_t size, DataChunk &output);
 
    private:
     static uint64_t _Put3DData(optional_ptr<const FunctionData> bind_data,
-                               ArrayReadGlobalState &gstate, double *pagevals,
+                               ArrayReadGlobalState &gstate, char *pagevals,
                                uint64_t size, DataChunk &output);
     static uint64_t _Put3DDataNoPrune(
         optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
         DataChunk &output);
     static uint64_t _Put3DDataNoPruneAndProjection(
         optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
         DataChunk &output);
     static uint64_t _Put3DNullableData(optional_ptr<const FunctionData> bind_data,
-                               ArrayReadGlobalState &gstate, double *pagevals,
+                               ArrayReadGlobalState &gstate, char *pagevals,
                                uint64_t size, DataChunk &output);
     static uint64_t _Put3DNullableDataNoPrune(
         optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
         DataChunk &output);
     static uint64_t _Put3DNullableDataNoPruneAndProjection(
         optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
         DataChunk &output);
 
     static uint64_t _Put2DData(optional_ptr<const FunctionData> bind_data,
-                               ArrayReadGlobalState &gstate, double *pagevals,
+                               ArrayReadGlobalState &gstate, char *pagevals,
                                uint64_t size, DataChunk &output);
     static uint64_t _Put2DDataNoPrune(
         optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
         DataChunk &output);
     static uint64_t _Put2DDataNoPruneAndProjection(
         optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
         DataChunk &output);
     static uint64_t _Put2DNullableData(optional_ptr<const FunctionData> bind_data,
-                               ArrayReadGlobalState &gstate, double *pagevals,
+                               ArrayReadGlobalState &gstate, char *pagevals,
                                uint64_t size, DataChunk &output);
     static uint64_t _Put2DNullableDataNoPrune(
         optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
         DataChunk &output);
     static uint64_t _Put2DNullableDataNoPruneAndProjection(
         optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
         DataChunk &output);
 
     static uint64_t _Put1DData(optional_ptr<const FunctionData> bind_data,
-                               ArrayReadGlobalState &gstate, double *pagevals,
+                               ArrayReadGlobalState &gstate, char *pagevals,
                                uint64_t size, DataChunk &output);
     static uint64_t _Put1DDataNoPrune(
         optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
         DataChunk &output);
     static uint64_t _Put1DDataNoPruneAndProjection(
         optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, double *pagevals, uint64_t size,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
         DataChunk &output);
 };
 }  // namespace duckdb

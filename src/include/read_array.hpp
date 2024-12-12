@@ -12,6 +12,7 @@
 #include "duckdb/main/extension_util.hpp"
 
 #include "buffer/bf.h"
+#include "io/tilestore.h"
 
 namespace duckdb {
 
@@ -21,19 +22,20 @@ struct ArrayReadData : public TableFunctionData {
         uint64_t **_dim_domains;
         uint64_t *_tile_size;
         uint64_t *_array_size_in_tile;
+        tilestore_datatype_t *_attr_types;
+        uint32_t _num_attrs;
+        storage_util_get_array_type(arrayname.c_str(), &format);
         storage_util_get_dim_domains(arrayname.c_str(), &_dim_domains,
                                      &dim_len);
         storage_util_get_tile_extents(arrayname.c_str(), &_tile_size, &dim_len);
         storage_util_get_dcoord_lens(_dim_domains, _tile_size, dim_len,
                                      &_array_size_in_tile);
+        storage_util_get_attribute_type(arrayname.c_str(), "", &_attr_types,
+                                        &_num_attrs);
 
         array_size_in_tile = vector<uint64_t>(_array_size_in_tile,
                                               _array_size_in_tile + dim_len);
         tile_size = vector<uint64_t>(_tile_size, _tile_size + dim_len);
-
-        // storage_util_free_dim_domains(&_dim_domains, dim_len);
-        // storage_util_free_tile_extents(&_tile_size, dim_len);
-        // storage_util_free_dcoord_lens(&_array_size_in_tile);
 
         this->arrayname = arrayname;
 
@@ -41,6 +43,24 @@ struct ArrayReadData : public TableFunctionData {
         for (uint32_t i = 0; i < dim_len; i++) {
             num_cells *= tile_size[i];
         }
+
+        for (uint32_t i = 0; i < _num_attrs; i++) {
+            if (_attr_types[i] == TILESTORE_INT32) {
+                attrTypes.push_back(LogicalType::INTEGER);
+            } else if (_attr_types[i] == TILESTORE_FLOAT32) {
+                attrTypes.push_back(LogicalType::FLOAT);
+            } else if (_attr_types[i] == TILESTORE_FLOAT64) {
+                attrTypes.push_back(LogicalType::DOUBLE);
+            } else {
+                throw NotImplementedException("Unsupported attribute type: " +
+                                              std::to_string(_attr_types[i]));
+            }
+        }
+
+        storage_util_free_dim_domains(&_dim_domains, dim_len);
+        storage_util_free_tile_extents(&_tile_size, dim_len);
+        storage_util_free_dcoord_lens(&_array_size_in_tile);
+        free(_attr_types);
     };
 
    public:
@@ -49,12 +69,14 @@ struct ArrayReadData : public TableFunctionData {
     vector<uint64_t> tile_size;
     uint64_t num_cells;
     uint32_t dim_len;
+    tilestore_format_t format;
 
     // requested coords
     // it will be set when binding. if empty, read all
     vector<int> requestedCoords;
 
-    bool is_coo_array = false;
+    // attribute types if multi-attributes
+    vector<LogicalType> attrTypes;
 };
 
 struct ArrayReadGlobalState : public GlobalTableFunctionState {
@@ -133,7 +155,7 @@ struct ArrayReadGlobalState : public GlobalTableFunctionState {
             } 
         }
 
-        std::cout << "coords=" << currentCoordsInTile[0] << "," << currentCoordsInTile[1] << "," << currentCoordsInTile[2] << std::endl;
+        // std::cout << "coords=" << currentCoordsInTile[0] << "," << currentCoordsInTile[1] << "," << currentCoordsInTile[2] << std::endl;
         return !isFinished;
     }
 
