@@ -127,6 +127,13 @@ void CoomaToCooCopyArrayWriter::WriteArrayData(ExecutionContext &context,
                 offset += size;
             }
         }
+
+        // set null=false if nullable array
+        if (page->nullbits_len > 0) {
+            bf_util_reset_cell_null(page, page->unfilled_idx);
+        }
+
+        // update unfilled idx
         page->unfilled_pagebuf_offset += offset;
         page->unfilled_idx++;
         // std::cout << ", buf[" << idx << "] = " << val[i] << std::endl;
