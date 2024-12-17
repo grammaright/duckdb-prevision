@@ -151,7 +151,9 @@ unique_ptr<FunctionData> ReadArrayBind(ClientContext &context,
                   << std::endl;
         if (it->first == "coords") {
             auto coords = ListValue::GetChildren(it->second);
-            assert(coords.size() == bind_data->dim_len);
+            if (coords.size() != bind_data->dim_len) {
+                throw std::runtime_error("Invalid number of coordinates");
+            }
 
             for (int d = 0; d < (int) bind_data->dim_len; d++) {
                 bind_data->requestedCoords.push_back(
@@ -161,11 +163,15 @@ unique_ptr<FunctionData> ReadArrayBind(ClientContext &context,
     }
 
     // TODO: CSR array is not supported yet
-    assert(bind_data->format != TILESTORE_SPARSE_CSR);
+    if (bind_data->format == TILESTORE_SPARSE_CSR) {
+        throw NotImplementedException("Sparse CSR array is not supported yet");
+    }
 
     // TODO: multi-attributes are not supported yet for dense array
     bool isMultiAttrs = bind_data->attrTypes.size() > 1;
-    if (bind_data->format == TILESTORE_DENSE) assert(!isMultiAttrs);
+    if (bind_data->format == TILESTORE_DENSE && isMultiAttrs) {
+        throw NotImplementedException("Multi-attributes are not supported yet");
+    }
 
     // dimensions first
     if (bind_data->dim_len == 1) {

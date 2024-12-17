@@ -41,7 +41,9 @@ void DenseToTileCopyArrayWriter::WriteArrayData(ExecutionContext &context,
                                           // exploit the vector type
     auto vector = FlatVector::GetData<double>(input.data[0]);
 
-    D_ASSERT(cur_idx + input.size() <= array_gstate.buf_size);
+    if (cur_idx + input.size() > array_gstate.buf_size) {
+        throw std::runtime_error("Buffer overflow");
+    }
 
     for (idx_t i = 0; i < input.size(); i++) {
         array_gstate.buf[cur_idx++] = vector[i];

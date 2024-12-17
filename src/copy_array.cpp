@@ -29,7 +29,9 @@ GlobalWriteArrayData::GlobalWriteArrayData(ClientContext &context,
 }
 
 void GlobalWriteArrayData::pin(vector<uint64_t> _tile_coords) {
-    assert(!is_pinned);
+    if (is_pinned) {
+        throw std::runtime_error("Tile is already pinned");
+    }
 
     // getbuffer
     for (uint32_t i = 0; i < this->dim_len; i++) {
@@ -50,8 +52,9 @@ void GlobalWriteArrayData::pin(vector<uint64_t> _tile_coords) {
 
     key = {arrname_char, tile_coords, dim_len, emptytileTemplate};
 
-    int res = BF_GetBuf(key, &page);
-    assert(res == BFE_OK);
+    if (BF_GetBuf(key, &page) != BFE_OK) {
+        throw std::runtime_error("Failed to get buffer");
+    }
 
     buf_size = page->pagebuf_len / sizeof(double);
     buf = (double *)bf_util_get_pagebuf(page);
