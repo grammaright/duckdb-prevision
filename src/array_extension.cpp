@@ -46,7 +46,12 @@ void ArrayExtension::Load(DuckDB &db) {
                 "initialized.\n");
     }
 
-    BF_Attach();
+    // When debuging: BF_Init() and Attached() will be called in
+    //    sqlite3_api_wrapper.cpp
+    // When using M2: this will be called
+    if (_mspace_data == nullptr) {
+        BF_Attach();
+    }
 
     std::cerr << "define funtions" << std::endl;
     auto table_function = ArrayExtension::GetReadArrayFunction();
