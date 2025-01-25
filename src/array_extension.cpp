@@ -63,7 +63,9 @@ void ArrayExtension::Load(DuckDB &db) {
     ExtensionUtil::RegisterFunction(*db.instance, table_function);
     ExtensionUtil::RegisterFunction(*db.instance, copy_function);
     ExtensionUtil::RegisterFunction(*db.instance, scalar_function);
-    ExtensionUtil::RegisterFunction(*db.instance, bfree_function);
+    // bf_free() is not supported anymore: 
+    //   it destroys the buffer pool but DuckDB still wants to use it
+    // ExtensionUtil::RegisterFunction(*db.instance, bfree_function);
 }
 
 void BFFreeFunction(DataChunk &args, ExpressionState &state, Vector &result) {
