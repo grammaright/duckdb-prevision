@@ -1,9 +1,9 @@
 
-#include "coo_reader.hpp"
+#include "csr_reader.hpp"
 
 namespace duckdb {
 
-uint64_t CooReader::_PutData(optional_ptr<const FunctionData> bind_data,
+uint64_t CsrReader::_PutData(optional_ptr<const FunctionData> bind_data,
                              ArrayReadGlobalState &gstate, char *pagevals,
                              vector<uint64_t *> &coords, uint64_t num_rows,
                              DataChunk &output) {
@@ -28,15 +28,44 @@ uint64_t CooReader::_PutData(optional_ptr<const FunctionData> bind_data,
     for (uint32_t i = 0; i < gstate.projection_ids.size(); i++) {
         auto dest = gstate.column_ids[gstate.projection_ids[i]];
         // dimensions
-        if (dest < coords.size()) {
+        if (dest == 0) {
+            // row column
+            auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
+
+            // first, find the idxptrIdx of the current cell
+            uint32_t idxptrIdx = 0;
+            for (uint64_t idx = 0; idx < data.tile_size[1]; idx++) {
+                if (coords[0][idx + 1] >= gstate.cell_idx) {
+                    idxptrIdx = idx;
+                    break;
+                }
+            }
+
+            // fill the output vector
+            for (uint64_t idx = 0; idx < local_remains; idx++) {
+                uint32_t buf_idx = gstate.cell_idx + idx;
+                // adjust idxptrIdx
+                while (coords[0][idxptrIdx + 1] <= buf_idx) {
+                    idxptrIdx++;
+                }
+                // put the value
+                auto lcoord = idxptrIdx;
+                auto gcoord =
+                    (uint32_t)lcoord +
+                    (gstate.currentCoordsInTile[0] * data.tile_size[0]);
+                vec[current_filled + idx] = gcoord;
+            }
+
+        } else if (dest == 1) {
+            // col column
             // fprintf(stderr, "d%lu\n", dest);
             auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
             for (uint64_t idx = 0; idx < local_remains; idx++) {
                 uint32_t buf_idx = gstate.cell_idx + idx;
-                auto lcoord = coords[dest][buf_idx];
+                auto lcoord = coords[1][buf_idx];
                 auto gcoord =
                     (uint32_t)lcoord +
-                    (gstate.currentCoordsInTile[dest] * data.tile_size[dest]);
+                    (gstate.currentCoordsInTile[1] * data.tile_size[1]);
                 vec[current_filled + idx] = gcoord;
                 // fprintf(stderr, "\tvec[%ld] = %d\n", idx,
                 //         vec[current_filled + idx]);
@@ -57,71 +86,7 @@ uint64_t CooReader::_PutData(optional_ptr<const FunctionData> bind_data,
     return produced;
 }
 
-uint64_t CooReader::_PutNullableData(optional_ptr<const FunctionData> bind_data,
-                             ArrayReadGlobalState &gstate, char *pagevals,
-                             vector<uint64_t *> &coords, uint64_t num_rows,
-                             DataChunk &output) {
-    auto &data = bind_data->Cast<ArrayReadData>();
-
-    // Calculating the maximum number of cells that can be filled
-    uint64_t current_filled = output.size();
-    auto total_remains = num_rows - gstate.cell_idx;
-    auto local_remains = std::min(
-        (uint64_t)STANDARD_VECTOR_SIZE - current_filled, total_remains);
-
-    // The number of actual produced cells
-    uint64_t produced = 0;
-
-    // fprintf(stderr, "size: %ld\n", num_rows);
-
-    // offsets for multi-attributes
-    vector<idx_t> offsets;
-    idx_t offset = 0;       // final value of it will be a size of a row
-    for (uint32_t i = 0; i < data.attrTypes.size(); i++) {
-        offsets.push_back(offset);
-        offset += GetTypeIdSize(data.attrTypes[i].InternalType());
-    }
-
-    // for each column
-    for (uint32_t i = 0; i < gstate.projection_ids.size(); i++) {
-        auto dest = gstate.column_ids[gstate.projection_ids[i]];
-        // dimensions
-        if (dest < coords.size()) {
-            // fprintf(stderr, "d%lu\n", dest);
-            auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
-            uint64_t filled = 0;
-            for (uint64_t idx = 0; idx < local_remains; idx++) {
-                uint32_t buf_idx = gstate.cell_idx + idx;
-                // continue if the cell is null
-                if (bf_util_is_cell_null(gstate.page, buf_idx)) 
-                    continue;
-
-                auto lcoord = coords[dest][buf_idx];
-                auto gcoord =
-                    (uint32_t)lcoord +
-                    (gstate.currentCoordsInTile[dest] * data.tile_size[dest]);
-                vec[current_filled + filled++] = gcoord;
-                // fprintf(stderr, "\tvec[%ld] = %d\n", idx,
-                //         vec[current_filled + idx]);
-            }
-            produced = filled;
-        } else {
-            // attributes
-            char *vals = (char *)pagevals;
-            int attrIdx = dest - coords.size();
-            auto type = data.attrTypes[attrIdx];
-            // fprintf(stderr, "a%d\n", attrIdx);
-            CopyToVectorNullable(type, output, i, vals, current_filled,
-                                 local_remains, offset, offsets[attrIdx],
-                                 gstate.cell_idx, gstate.page);
-        }
-    }
-
-    gstate.cell_idx += produced;
-    return produced;
-}
-
-uint64_t CooReader::_PutDataNoPrune(optional_ptr<const FunctionData> bind_data,
+uint64_t CsrReader::_PutDataNoPrune(optional_ptr<const FunctionData> bind_data,
                                     ArrayReadGlobalState &gstate,
                                     char *pagevals,
                                     vector<uint64_t *> &coords,
@@ -141,19 +106,44 @@ uint64_t CooReader::_PutDataNoPrune(optional_ptr<const FunctionData> bind_data,
         offset += GetTypeIdSize(data.attrTypes[i].InternalType());
     }
 
+    // the idxptrIdx of the current cell for the row idxptr
+    uint32_t idxptrIdx = 0;
+    for (uint64_t idx = 0; idx < data.tile_size[1]; idx++) {
+        if (coords[0][idx + 1] >= gstate.cell_idx) {
+            idxptrIdx = idx;
+            break;
+        }
+    }
+
     for (uint64_t idx = 0; idx < local_remains; idx++) {
         uint64_t buf_idx = gstate.cell_idx + idx;
-
-        // uint32_t x = (uint32_t)pagevals[buf_idx];
-        // uint32_t y = (uint32_t)pagevals[buf_idx + 1];
 
         for (uint32_t i = 0; i < gstate.column_ids.size(); i++) {
             auto colIdx = gstate.column_ids[i];
 
             // dimensions
-            if (colIdx < coords.size()) {
+            if (colIdx == 0) {
+                // row column
+                // adjust idxptrIdx
+                while (coords[0][idxptrIdx + 1] <= buf_idx) {
+                    idxptrIdx++;
+                }
+
+                // put the value
                 auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
-                vec[current_filled + idx] = (uint32_t)coords[colIdx][buf_idx];
+                auto lcoord = (uint32_t) idxptrIdx;
+                auto gcoord =
+                    (uint32_t)lcoord +
+                    (gstate.currentCoordsInTile[0] * data.tile_size[0]);
+                vec[current_filled + idx] = gcoord;
+            } else if (colIdx == 1) {
+                // col column
+                auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
+                auto lcoord = (uint32_t)coords[colIdx][buf_idx];
+                auto gcoord =
+                    (uint32_t)lcoord +
+                    (gstate.currentCoordsInTile[1] * data.tile_size[1]);
+                vec[current_filled + idx] = gcoord;
             } else {
                 // attributes
                 char *vals = (char *)pagevals;
@@ -175,7 +165,7 @@ uint64_t CooReader::_PutDataNoPrune(optional_ptr<const FunctionData> bind_data,
     return produced;
 }
 
-uint64_t CooReader::_PutDataNoPruneAndProjection(
+uint64_t CsrReader::_PutDataNoPruneAndProjection(
     optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
     char *pagevals, vector<uint64_t *> &coords, uint64_t num_rows,
     DataChunk &output) {
@@ -194,15 +184,43 @@ uint64_t CooReader::_PutDataNoPruneAndProjection(
         offset += GetTypeIdSize(data.attrTypes[i].InternalType());
     }
 
+    // the idxptrIdx of the current cell for the row idxptr
+    uint32_t idxptrIdx = 0;
+    for (uint64_t idx = 0; idx < data.tile_size[1]; idx++) {
+        if (coords[0][idx + 1] >= gstate.cell_idx) {
+            idxptrIdx = idx;
+            break;
+        }
+    }
+
     for (uint64_t idx = 0; idx < local_remains; idx++) {
         uint64_t buf_idx = gstate.cell_idx + idx;
 
         // iterate over columns
         for (uint32_t i = 0; i < output.ColumnCount(); i++) {
             // dimensions
-            if (i < coords.size()) {
-                auto vec = FlatVector::GetData<uint32_t>(output.data[i]);
-                vec[current_filled + idx] = (uint32_t)coords[i][buf_idx];
+            if (i == 0) {
+                // row column
+                // adjust idxptrIdx
+                while (coords[0][idxptrIdx + 1] <= buf_idx) {
+                    idxptrIdx++;
+                }
+
+                // put the value
+                auto vec = FlatVector::GetData<uint32_t>(output.data[0]);
+                auto lcoord = (uint32_t) idxptrIdx;
+                auto gcoord =
+                    (uint32_t)lcoord +
+                    (gstate.currentCoordsInTile[0] * data.tile_size[0]);
+                vec[current_filled + idx] = gcoord;
+            } else if (i == 1) {
+                // col column
+                auto vec = FlatVector::GetData<uint32_t>(output.data[1]);
+                auto lcoord = (uint32_t)coords[i][buf_idx];
+                auto gcoord =
+                    (uint32_t)lcoord +
+                    (gstate.currentCoordsInTile[1] * data.tile_size[1]);
+                vec[current_filled + idx] = gcoord;
             } else {
                 // attributes
                 char *vals = (char *)pagevals;
@@ -223,24 +241,15 @@ uint64_t CooReader::_PutDataNoPruneAndProjection(
     return produced;
 }
 
-uint64_t CooReader::PutData(optional_ptr<const FunctionData> bind_data,
+uint64_t CsrReader::PutData(optional_ptr<const FunctionData> bind_data,
                             ArrayReadGlobalState &gstate, char *pagevals,
                             vector<uint64_t *> &coords, uint64_t num_of_cells,
                             DataChunk &output) {
     bool nullable = gstate.page->type == DENSE_FIXED_NULLABLE ||
                     gstate.page->type == SPARSE_FIXED_NULLABLE;
-    if (nullable) {
-        if (gstate.projection_ids.size() > 0)  // filter_prune ON
-            return _PutNullableData(bind_data, gstate, pagevals, coords,
-                                    num_of_cells, output);
-        else if (gstate.column_ids.size() ==
-                 output.data.size())  // no filter prune
-            throw NotImplementedException(
-                "_PutNullableDataNoPrune() is not supported yet");
-        else  // projection_pushdown and filter_prune are both false
-            throw NotImplementedException(
-                "_PutNullableDataNoPruneAndProjection() is not supported yet");
 
+    if (nullable) {
+        throw NotImplementedException("Nullable CSR is not supported yet");
     } else {
         if (gstate.projection_ids.size() > 0)  // filter_prune ON
             return _PutData(bind_data, gstate, pagevals, coords, num_of_cells,

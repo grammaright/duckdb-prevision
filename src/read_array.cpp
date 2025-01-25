@@ -8,6 +8,7 @@
 #include "array_extension.hpp"
 #include "array_reader.hpp"
 #include "coo_reader.hpp"
+#include "csr_reader.hpp"
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
@@ -46,6 +47,9 @@ static void ReadArrayFunctionWithCoords(ClientContext &context,
         // TODO: Multi-tile array is not tested
         read = CooReader::PutData(data_p.bind_data, gstate, pagevals, coords,
                                   size, output);
+    } else if (data.format == TILESTORE_SPARSE_CSR) {
+        read = CsrReader::PutData(data_p.bind_data, gstate, pagevals, coords,
+                                  size, output);
     } else {
         read = ArrayReader::PutData(data_p.bind_data, gstate, pagevals,
                                             size, output);
@@ -79,17 +83,23 @@ static void ReadArrayFunctionAll(ClientContext &context,
         char *pagevals = (char *)bf_util_get_pagebuf(gstate.page);
         uint64_t read = 0;
 
-        if (data.format == TILESTORE_SPARSE_COO) {
-            vector<uint64_t*> coords;
+        if (data.format == TILESTORE_DENSE) {
+            read = ArrayReader::PutData(data_p.bind_data, gstate, pagevals,
+                                        size, output);
+        } else {
+            vector<uint64_t *> coords;
             for (int d = 0; d < (int)data.dim_len; d++) {
                 coords.push_back(
                     (uint64_t *)bf_util_pagebuf_get_coords(gstate.page, d));
             }
-            read = CooReader::PutData(data_p.bind_data, gstate, pagevals,
-                                      coords, size, output);
-        } else {
-            read = ArrayReader::PutData(data_p.bind_data, gstate, pagevals,
-                                                size, output);
+
+            if (data.format == TILESTORE_SPARSE_COO) {
+                read = CooReader::PutData(data_p.bind_data, gstate, pagevals,
+                                          coords, size, output);
+            } else {
+                read = CsrReader::PutData(data_p.bind_data, gstate, pagevals,
+                                          coords, size, output);
+            }
         }
 
         // set cardinality
@@ -160,11 +170,6 @@ unique_ptr<FunctionData> ReadArrayBind(ClientContext &context,
                     coords[d].GetValue<int64_t>());
             }
         }
-    }
-
-    // TODO: CSR array is not supported yet
-    if (bind_data->format == TILESTORE_SPARSE_CSR) {
-        throw NotImplementedException("Sparse CSR array is not supported yet");
     }
 
     // TODO: multi-attributes are not supported yet for dense array

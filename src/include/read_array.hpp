@@ -16,6 +16,27 @@
 
 namespace duckdb {
 
+void CopyToVectorNullable(LogicalType type,   // the type of the attribute
+                          DataChunk &output,  // the output data chunk
+                          idx_t vecIdx,       // the index of the vector in the data chunk
+                          char *vals,         // the array data
+                          uint64_t current_filled,  // the current number of filled cells in the vector
+                          uint64_t local_remains,   // the maximum number of cells to fill
+                          idx_t dataLen,            // the length of the cell
+                          idx_t offset,             // the offset of the cell
+                          idx_t cell_starting_idx,  // the starting index of the cell
+                          PFpage* page);           // the page
+
+void CopyToVector(LogicalType type,     // the type of the attribute
+                  DataChunk &output,    // the output data chunk
+                  idx_t vecIdx,         // the index of the vector in the data chunk
+                  char *vals,           // the array data
+                  uint64_t current_filled,  // the current number of filled cells in the vector
+                  uint64_t local_remains,   // the maximum number of cells to fill
+                  idx_t dataLen,            // the length of the cell
+                  idx_t offset,           // the offset of the cell
+                  idx_t cell_starting_idx);  // the starting index of the cell
+
 struct ArrayReadData : public TableFunctionData {
    public:
     ArrayReadData(string arrayname) {
