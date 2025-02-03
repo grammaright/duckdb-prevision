@@ -23,6 +23,8 @@ SELECT x, y, a0, a1, a2 FROM read_array('finedust', coords=[0, 0]);
 
 ### COPY Function
 
+**COPY functions are deprecated**
+
 - `MODE 0`: COO table with only dimensions and value to a dense array
 - `MODE 1`: table with only values (sorted) to dense array
     - The table must be filled

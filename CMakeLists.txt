@@ -15,15 +15,15 @@ project(${TARGET_NAME})
 include_directories(src/include)
 
 # TileStore & BF
-# include_directories("$ENV{PREVISION_PATH}/tilestore/include")
-# include_directories("$ENV{PREVISION_PATH}/buffertile/include")
 include_directories("$ENV{PREVISION_PATH}/src/include")
 
 set(EXTENSION_SOURCES src/array_extension.cpp
                       src/read_array.cpp 
                       src/copy_array.cpp 
+                      src/array_reader/copy_to_vector.cpp
                       src/array_reader/array_reader.cpp 
                       src/array_reader/coo_reader.cpp 
+                      src/array_reader/csr_reader.cpp 
                       src/array_writer/base_writer.cpp
                       src/array_writer/coo_to_dense_writer.cpp
                       src/array_writer/dense_to_dense_writer.cpp
@@ -39,14 +39,10 @@ target_link_libraries(${EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(${LOADABLE_EXTENSION_NAME} OpenSSL::SSL OpenSSL::Crypto)
 
 # TileStore & BF
-# target_link_libraries(${EXTENSION_NAME} "$ENV{PREVISION_PATH}/buffertile/lib/libbf.a")
-# target_link_libraries(${EXTENSION_NAME} "$ENV{PREVISION_PATH}/tilestore/lib/libtilestore.a")
-target_link_libraries(${EXTENSION_NAME} "$ENV{PREVISION_PATH}/build/libprevision_lib.a")
+target_link_libraries(${EXTENSION_NAME} "$ENV{PREVISION_PATH}/build/libprevision.so")
 target_link_libraries(${EXTENSION_NAME} -lrt)
 
-# target_link_libraries(${LOADABLE_EXTENSION_NAME} "$ENV{PREVISION_PATH}/buffertile/lib/libbf.a")
-# target_link_libraries(${LOADABLE_EXTENSION_NAME} "$ENV{PREVISION_PATH}/tilestore/lib/libtilestore.a")
-target_link_libraries(${LOADABLE_EXTENSION_NAME} "$ENV{PREVISION_PATH}/build/libprevision_lib.a")
+target_link_libraries(${LOADABLE_EXTENSION_NAME} "$ENV{PREVISION_PATH}/build/libprevision.so")
 target_link_libraries(${LOADABLE_EXTENSION_NAME} -lrt)
 
 # Find BLAS
