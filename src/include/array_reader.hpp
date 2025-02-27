@@ -90,5 +90,28 @@ class ArrayReader {
         optional_ptr<const FunctionData> bind_data,
         ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
         DataChunk &output);
+
+    static uint64_t _Put4DData(optional_ptr<const FunctionData> bind_data,
+                               ArrayReadGlobalState &gstate, char *pagevals,
+                               uint64_t size, DataChunk &output);
+    static uint64_t _Put4DDataNoPrune(
+        optional_ptr<const FunctionData> bind_data,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
+        DataChunk &output);
+    static uint64_t _Put4DDataNoPruneAndProjection(
+        optional_ptr<const FunctionData> bind_data,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
+        DataChunk &output);
+    static uint64_t _Put4DNullableData(optional_ptr<const FunctionData> bind_data,
+                               ArrayReadGlobalState &gstate, char *pagevals,
+                               uint64_t size, DataChunk &output);
+    static uint64_t _Put4DNullableDataNoPrune(
+        optional_ptr<const FunctionData> bind_data,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
+        DataChunk &output);
+    static uint64_t _Put4DNullableDataNoPruneAndProjection(
+        optional_ptr<const FunctionData> bind_data,
+        ArrayReadGlobalState &gstate, char *pagevals, uint64_t size,
+        DataChunk &output);
 };
 }  // namespace duckdb

@@ -196,9 +196,19 @@ unique_ptr<FunctionData> ReadArrayBind(ClientContext &context,
         names.emplace_back("x");
         names.emplace_back("y");
         names.emplace_back("z");
+    } else if (bind_data->dim_len == 4) {
+        return_types.push_back(LogicalType::UINTEGER);
+        return_types.push_back(LogicalType::UINTEGER);
+        return_types.push_back(LogicalType::UINTEGER);
+        return_types.push_back(LogicalType::UINTEGER);
+
+        names.emplace_back("x");
+        names.emplace_back("y");
+        names.emplace_back("z");
+        names.emplace_back("zz");
     } else {
         throw NotImplementedException(
-            "Only 1D, 2D, and 3D arrays are supported");
+            "Only 1D, 2D, 3D, and 4D arrays are supported");
     }
 
     // attributes
