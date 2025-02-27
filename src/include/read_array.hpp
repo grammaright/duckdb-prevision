@@ -212,13 +212,29 @@ struct ArrayReadGlobalState : public GlobalTableFunctionState {
     void unpin() {
         if (page == NULL) return;
 
-        auto dcoords = make_uniq_array<uint64_t>(2);
-        for (uint32_t idx = 0; idx < 2; idx++) {
+        auto dcoords = make_uniq_array<uint64_t>(dimLen);
+        for (uint32_t idx = 0; idx < dimLen; idx++) {
             dcoords[idx] = (uint64_t) currentCoordsInTile[idx];
         }
 
-        array_key key = {_arrname_char, dcoords.get(), 2, BF_EMPTYTILE_DENSE};
-        BF_UnpinBuf(key);
+        array_key key = {_arrname_char, dcoords.get(), dimLen, BF_EMPTYTILE_DENSE};
+        // std::cerr << "Unpinning buffer" << std::endl;
+        // std::cerr << "Array name: " << _arrname_char << std::endl;
+        // std::cerr << "Coords: " << dcoords[0] << ", " << dcoords[1] << ", "
+        //           << dcoords[2] << std::endl;
+        auto res = BF_UnpinBuf(key);
+        // FIXME: currently just skip if there is no hash found. 
+        //   function call order might be wrong.
+        if (res == BFE_HASHNOTFOUND) {
+            std::cerr << "No frequently" << std::endl;
+            page = NULL;
+            return;
+        }
+
+        if (res != BFE_OK) {
+            throw InternalException("Failed to unpin buffer: " +
+                                    std::to_string(res));
+        }
         page = NULL;
     }
 
