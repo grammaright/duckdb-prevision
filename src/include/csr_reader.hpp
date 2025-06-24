@@ -27,37 +27,36 @@
 
 namespace duckdb {
 class CsrReader {
-   public:
-    static uint64_t PutData(optional_ptr<const FunctionData> bind_data,
-                            ArrayReadGlobalState &gstate, char *pagevals,
-                            vector<uint64_t *> &coords, uint64_t num_of_cells,
-                            DataChunk &output);
+ public:
+  static uint64_t PutData(optional_ptr<const FunctionData> bind_data,
+                          ArrayReadGlobalState &gstate, char *pagevals,
+                          vector<uint64_t *> &coords, uint64_t num_of_cells,
+                          DataChunk &output);
 
-   private:
-    static uint64_t _PutData(optional_ptr<const FunctionData> bind_data,
-                             ArrayReadGlobalState &gstate, char *pagevals,
-                             vector<uint64_t *> &coords, uint64_t num_of_cells,
-                             DataChunk &output);
-    static uint64_t _PutNullableData(optional_ptr<const FunctionData> bind_data,
-                                     ArrayReadGlobalState &gstate,
-                                     char *pagevals, vector<uint64_t *> &coords,
-                                     uint64_t num_of_cells, DataChunk &output);
-    static uint64_t _PutDataNoPrune(optional_ptr<const FunctionData> bind_data,
-                                    ArrayReadGlobalState &gstate,
-                                    char *pagevals,
-                                    vector<uint64_t *> &coords,
-                                    uint64_t num_of_cells, DataChunk &output);
-    static uint64_t _PutNullableDataNoPrune(
-        optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, char *pagevals,
-        vector<uint64_t *> &coords, uint64_t num_of_cells, DataChunk &output);
-    static uint64_t _PutDataNoPruneAndProjection(
-        optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, char *pagevals,
-        vector<uint64_t *> &coords, uint64_t num_of_cells, DataChunk &output);
-    static uint64_t _PutNullableDataNoPruneAndProjection(
-        optional_ptr<const FunctionData> bind_data,
-        ArrayReadGlobalState &gstate, char *pagevals,
-        vector<uint64_t *> &coords, uint64_t num_of_cells, DataChunk &output);
+ private:
+  static uint64_t _PutData(optional_ptr<const FunctionData> bind_data,
+                           ArrayReadGlobalState &gstate, char *pagevals,
+                           vector<uint64_t *> &coords, uint64_t num_of_cells,
+                           DataChunk &output);
+  static uint64_t _PutNullableData(optional_ptr<const FunctionData> bind_data,
+                                   ArrayReadGlobalState &gstate, char *pagevals,
+                                   vector<uint64_t *> &coords,
+                                   uint64_t num_of_cells, DataChunk &output);
+  static uint64_t _PutDataNoPrune(optional_ptr<const FunctionData> bind_data,
+                                  ArrayReadGlobalState &gstate, char *pagevals,
+                                  vector<uint64_t *> &coords,
+                                  uint64_t num_of_cells, DataChunk &output);
+  static uint64_t _PutNullableDataNoPrune(
+      optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
+      char *pagevals, vector<uint64_t *> &coords, uint64_t num_of_cells,
+      DataChunk &output);
+  static uint64_t _PutDataNoPruneAndProjection(
+      optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
+      char *pagevals, vector<uint64_t *> &coords, uint64_t num_of_cells,
+      DataChunk &output);
+  static uint64_t _PutNullableDataNoPruneAndProjection(
+      optional_ptr<const FunctionData> bind_data, ArrayReadGlobalState &gstate,
+      char *pagevals, vector<uint64_t *> &coords, uint64_t num_of_cells,
+      DataChunk &output);
 };
 }  // namespace duckdb

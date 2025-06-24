@@ -4,7 +4,7 @@
 #include <thread>
 
 #include "array_extension.hpp"
-#include "array_reader.hpp"
+#include "dense_reader.hpp"
 #include "coo_reader.hpp"
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
@@ -19,83 +19,83 @@ namespace duckdb {
 
 void CreateArrayScalarFunction(DataChunk &args, ExpressionState &state,
                                Vector &result) {
-    // Getting vectors
-    auto vec_arrname = FlatVector::GetData<string_t>(args.data[0]);
-    // auto vec_arrsize = ListVector::GetData(args.data[1]);
-    // auto vec_arrsize = ListVector::GetData(args.data[1]);
-    // auto vec_tilesize = ListVector::GetData(args.data[2]);
-    auto vec_type = FlatVector::GetData<string_t>(args.data[3]);
-    auto vec_is_sparse = FlatVector::GetData<bool>(args.data[4]);
-    auto vec_is_nullable = FlatVector::GetData<bool>(args.data[5]);
+  // Getting vectors
+  auto vec_arrname = FlatVector::GetData<string_t>(args.data[0]);
+  // auto vec_arrsize = ListVector::GetData(args.data[1]);
+  // auto vec_arrsize = ListVector::GetData(args.data[1]);
+  // auto vec_tilesize = ListVector::GetData(args.data[2]);
+  auto vec_type = FlatVector::GetData<string_t>(args.data[3]);
+  auto vec_is_sparse = FlatVector::GetData<bool>(args.data[4]);
+  auto vec_is_nullable = FlatVector::GetData<bool>(args.data[5]);
 
-    // check the vector length is one
-    if (args.size() != 1) {
-        throw InternalException("The input size for create_array should be 1");
-    }
+  // check the vector length is one
+  if (args.size() != 1) {
+    throw InternalException("The input size for create_array should be 1");
+  }
 
-    // data for lists
-    auto d_arrsize = ListVector::GetEntry(args.data[1]);
-    auto d_tilesize = ListVector::GetEntry(args.data[2]);
+  // data for lists
+  auto d_arrsize = ListVector::GetEntry(args.data[1]);
+  auto d_tilesize = ListVector::GetEntry(args.data[2]);
 
-    // prepare for tilestore
-    uint32_t dim_len = ListVector::GetListSize(args.data[1]);
-    uint64_t *arr = new uint64_t[dim_len];
-    uint64_t *tile = new uint64_t[dim_len];
-    for (uint32_t i = 0; i < dim_len; i++) {
-        arr[i] = d_arrsize.GetValue(i).GetValue<uint64_t>();
-        tile[i] = d_tilesize.GetValue(i).GetValue<uint64_t>();
-    }
+  // prepare for tilestore
+  uint32_t dim_len = ListVector::GetListSize(args.data[1]);
+  uint64_t *arr = new uint64_t[dim_len];
+  uint64_t *tile = new uint64_t[dim_len];
+  for (uint32_t i = 0; i < dim_len; i++) {
+    arr[i] = d_arrsize.GetValue(i).GetValue<uint64_t>();
+    tile[i] = d_tilesize.GetValue(i).GetValue<uint64_t>();
+  }
 
-    tilestore_datatype_t attr_type;
-    if (strcmp(vec_type[0].GetData(), "FLOAT64") == 0) {
-        attr_type = TILESTORE_FLOAT64;
-    } else if (strcmp(vec_type[0].GetData(), "FLOAT32") == 0) {
-        attr_type = TILESTORE_FLOAT32;
-    } else if (strcmp(vec_type[0].GetData(), "UINT64") == 0) {
-        attr_type = TILESTORE_UINT64;
-    } else if (strcmp(vec_type[0].GetData(), "CHAR") == 0) {
-        attr_type = TILESTORE_CHAR;
-    } else {
-        throw NotImplementedException("Unsupported type for create_array");
-    }
+  tilestore_datatype_t attr_type;
+  if (strcmp(vec_type[0].GetData(), "FLOAT64") == 0) {
+    attr_type = TILESTORE_FLOAT64;
+  } else if (strcmp(vec_type[0].GetData(), "FLOAT32") == 0) {
+    attr_type = TILESTORE_FLOAT32;
+  } else if (strcmp(vec_type[0].GetData(), "UINT64") == 0) {
+    attr_type = TILESTORE_UINT64;
+  } else if (strcmp(vec_type[0].GetData(), "CHAR") == 0) {
+    attr_type = TILESTORE_CHAR;
+  } else {
+    throw NotImplementedException("Unsupported type for create_array");
+  }
 
-    tilestore_format_t format = TILESTORE_DENSE;
-    if (vec_is_sparse[0]) {
-        format = TILESTORE_SPARSE_CSR;
-    }
+  tilestore_format_t format = TILESTORE_DENSE;
+  if (vec_is_sparse[0]) {
+    format = TILESTORE_SPARSE_CSR;
+  }
 
-    string arrname;
-    arrname.append(vec_arrname[0].GetData(), vec_arrname[0].GetSize());
-    arrname.append("\0");
+  string arrname;
+  arrname.append(vec_arrname[0].GetData(), vec_arrname[0].GetSize());
+  arrname.append("\0");
 
-    // create array
-    if (tilestore_create_array(
-            arrname.c_str(), arr, tile, dim_len, 1, &attr_type, format,
-            vec_is_nullable[0] ? TILESTORE_NULLABLE : TILESTORE_NOT_NULLABLE) !=
-        TILESTORE_OK) {
-        throw InternalException("Failed to create array");
-    }
+  // create array
+  if (tilestore_create_array(
+          arrname.c_str(), arr, tile, dim_len, 1, &attr_type, format,
+          vec_is_nullable[0] ? TILESTORE_NULLABLE : TILESTORE_NOT_NULLABLE) !=
+      TILESTORE_OK) {
+    throw InternalException("Failed to create array");
+  }
 
-    auto vec = FlatVector::GetData<bool>(result);
-    vec[0] = true;
-    result.SetVectorType(VectorType::CONSTANT_VECTOR);
+  auto vec = FlatVector::GetData<bool>(result);
+  vec[0] = true;
+  result.SetVectorType(VectorType::CONSTANT_VECTOR);
 }
 
 ScalarFunction ArrayExtension::GetCreateArrayFunction() {
-    // this function should be called only once like "SELECT create_array(...)"
-    ScalarFunction function = ScalarFunction(
-        "create_array",
-        {
-            LogicalType::VARCHAR,                     // Array name
-            LogicalType::LIST(LogicalType::INTEGER),  // Array size
-            LogicalType::LIST(LogicalType::INTEGER),  // Tile size
-            LogicalType::VARCHAR,                     // data type
-            LogicalType::BOOLEAN,                     // is sparse array?
-            LogicalType::BOOLEAN                      // is nullable?
-        },
-        LogicalType::BOOLEAN, CreateArrayScalarFunction);
+  // this function should be called only once like "SELECT create_array(...)"
+  ScalarFunction function =
+      ScalarFunction("create_array",
+                     {
+                         LogicalType::VARCHAR,                     // Array name
+                         LogicalType::LIST(LogicalType::INTEGER),  // Array size
+                         LogicalType::LIST(LogicalType::INTEGER),  // Tile size
+                         LogicalType::VARCHAR,                     // data type
+                         LogicalType::BOOLEAN,  // is sparse array?
+                         LogicalType::BOOLEAN   // is nullable?
+                     },
+                     LogicalType::BOOLEAN, CreateArrayScalarFunction);
 
-    return function;
+  return function;
 }
 
 }  // namespace duckdb

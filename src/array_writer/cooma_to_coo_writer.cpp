@@ -72,18 +72,18 @@ void CoomaToCooCopyArrayWriter::WriteArrayData(ExecutionContext &context,
             if (tcoords[d] != array_gstate.tile_coords[d]) {
                 out = true;
             }
+            // std::cerr << "tcoords[d]=" << tcoords[d] << std::endl;
         }
-        // std::cerr << " onedcoord=" << onedcoord << ", val=" << val[i] << std::endl;
 
         // unpin the tile if out of the tile
         if (out) {
-            // std::cout << ", unpinning";
+            // std::cerr << " unpinning";
             array_gstate.unpin();
         }
 
         // get destination tile
         if (!array_gstate.is_pinned) {
-            // std::cout << ", pinning";
+            // std::cerr << ", pinning";
             array_gstate.pin(
                 vector<uint64_t>(tcoords, tcoords + array_data.dim_len));
 

@@ -21,7 +21,7 @@ set(EXTENSION_SOURCES src/array_extension.cpp
                       src/read_array.cpp 
                       src/copy_array.cpp 
                       src/array_reader/copy_to_vector.cpp
-                      src/array_reader/array_reader.cpp 
+                      src/array_reader/dense_reader.cpp 
                       src/array_reader/coo_reader.cpp 
                       src/array_reader/csr_reader.cpp 
                       src/array_writer/base_writer.cpp
